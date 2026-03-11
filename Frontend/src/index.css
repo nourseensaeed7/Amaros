@@ -1,0 +1,16 @@
+@import "tailwindcss";
+body {
+    font-family: 'DM Sans', sans-serif;
+    background-color:whitesmoke;
+    /* padding:0 1em 0 1em; */
+    color: black;
+  }
+  .cinzel {
+    font-family: 'Cinzel', serif;
+    font-optical-sizing: auto;
+    font-weight: 400; /* change as needed */
+    font-style: normal;
+  }
+  .indent {
+   margin-left: 20px;
+}
