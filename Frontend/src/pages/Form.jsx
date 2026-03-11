@@ -6,7 +6,7 @@ import { supabase } from "../supabaseClient";
 import { Vehicles } from "../data/Vehicles";
 import Nav from "../components/Nav";
 import Footer from "../components/Footer.jsx";
-
+import PageLoader from "../components/PageLoader";
 // ─── Country Lists ────────────────────────────────────────────────────────────
 
 const COUNTRIES = [
@@ -401,6 +401,7 @@ const Form = () => {
   };
 
   return (
+    <PageLoader>
     <section>
       <Nav />
       <div className="flex flex-col-reverse pt-15 m-5 md:m-10 gap-5 justify-center md:flex-row">
@@ -878,6 +879,7 @@ const Form = () => {
       </div>
       <Footer />
     </section>
+    </PageLoader>
   );
 };
 

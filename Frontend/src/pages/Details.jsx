@@ -10,7 +10,7 @@ import Nav from "../components/Nav";
 import { IoMdArrowDropright } from "react-icons/io";
 import { IoMdArrowDropleft } from "react-icons/io";
 import Footer from "../components/Footer.jsx";
-
+import PageLoader from "../components/PageLoader";
 const Details = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -32,6 +32,7 @@ const Details = () => {
     return () => clearInterval(interval);
   }, []);
   return (
+    <PageLoader>
     <section>
       <Nav />
       <div className="flex flex-col-reverse justify-self-center justify-center bg-yellow-600/5 border-10 border-yellow-900/5 shadow-2xl rounded-2xl text-yellow-900   mx-5 my-20 md:flex-col-reverse lg:m-20 lg:flex-row  ">
@@ -138,6 +139,7 @@ const Details = () => {
       </div>
       <Footer/>
     </section>
+    </PageLoader>
   );
 };
 export default Details;
