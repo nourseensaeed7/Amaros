@@ -9,10 +9,11 @@ import Details from "./pages/Details.jsx";
 import Form from "./pages/Form.jsx";
 import Vans from "./pages/AllVans.jsx"
 import Rental from "./pages/rentInst.jsx"
-
+import ScrollToTop from "./ScrollToTop";
 const App = () => {
   return (
     <HashRouter>
+      <ScrollToTop/>
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/Vehicle-Details/:id" element={<Details/>}/>
