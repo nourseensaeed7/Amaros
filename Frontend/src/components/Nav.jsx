@@ -35,7 +35,7 @@ const Navbar = () => {
           {/* Desktop Menu */}
           <ul className="hidden items-center text-lg md:flex gap-8 font-medium">
             <li className="cursor-pointer transition-all duration-400 ease-in-out hover:bg-gradient-to-r from-yellow-700 via-yellow-500 to-yellow-800 hover:text-transparent bg-clip-text">
-              <a href="/">Home</a>
+              <Link to="/">Home</Link>
             </li>
             <li className="cursor-pointer transition-all duration-400 ease-in-out hover:bg-gradient-to-r from-yellow-700 via-yellow-500 to-yellow-800 hover:text-transparent bg-clip-text">
               <a href="">Über uns</a>
