@@ -5,6 +5,7 @@ import logo from "../assets/logo.png";
 import { FaWhatsapp } from "react-icons/fa";
 import { FaFacebookSquare } from "react-icons/fa";
 import { FaInstagram } from "react-icons/fa";
+import { Link } from "react-router-dom";
 const Navbar = () => {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
@@ -23,14 +24,14 @@ const Navbar = () => {
       >
         <div className="max-w-7xl mx-10 py-4 flex justify-between items-center">
           {/* Logo */}
-          <a href="/">
+          <Link to="/">
             <div className="flex items-center gap-2">
               <img src={logo} alt="logo" className="h-12 w-auto" />
               <h1 className=" bg-gradient-to-r from-yellow-700 via-yellow-500 to-yellow-800 text-transparent bg-clip-text tracking-widest cinzel text-3xl">
                 Amaros
               </h1>
             </div>
-          </a>
+          </Link>
           {/* Desktop Menu */}
           <ul className="hidden items-center text-lg md:flex gap-8 font-medium">
             <li className="cursor-pointer transition-all duration-400 ease-in-out hover:bg-gradient-to-r from-yellow-700 via-yellow-500 to-yellow-800 hover:text-transparent bg-clip-text">
@@ -84,7 +85,7 @@ const Navbar = () => {
 
         <ul className="flex flex-col gap-6 p-6 font-medium">
             <li className="cursor-pointer transition-all duration-400 ease-in-out hover:bg-gradient-to-r from-yellow-700 via-yellow-500 to-yellow-800 hover:text-transparent bg-clip-text">
-            <a href="/">Home</a>
+            <Link to="/">Home</Link>
           </li>
             <li className="cursor-pointer transition-all duration-400 ease-in-out hover:bg-gradient-to-r from-yellow-700 via-yellow-500 to-yellow-800 hover:text-transparent bg-clip-text">
             <a href="">Über uns</a>
