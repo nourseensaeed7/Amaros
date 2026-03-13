@@ -5,8 +5,10 @@ import { FaWhatsapp } from "react-icons/fa";
 import { FaFacebookSquare } from "react-icons/fa";
 import { FaInstagram } from "react-icons/fa";
 import logo from "../assets/logo.png";
+import { useNavigate } from "react-router-dom";
 
 const Footer = () => {
+  const navigate=useNavigate();
   return (
     <footer className="bg-amber-950/10">
       <div className="flex flex-col p-5 gap-4 md:flex-row pt-10 justify-around text-amber-950">
@@ -52,7 +54,11 @@ const Footer = () => {
         </div>
           <div className="">
             <h2 className="text-xl font-black">Rechtliches</h2>
-
+            <div className="flex flex-col m-1 gap-2 font-bold">
+              <a className="cursor-pointer" onClick={()=>navigate('/Imprint')} >Impressum</a>
+              <a className="cursor-pointer" onClick={()=>navigate('/Policy')}>Datenschutzerklärung</a>
+              <a className="cursor-pointer" onClick={()=>navigate('/Terms')}>Allgemeine Geschäftsbedingungen (AGB)</a>
+            </div>
           </div>
       </div>
       <div className="flex flex-col justify-center items-center">
