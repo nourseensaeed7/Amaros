@@ -12,6 +12,9 @@ export const Vehicles =[
         payload:"970 kg",
         fuel:"Diesel",
         transmission:"Manual",
+        width:"2.10 m",
+        height:"2.13 m",
+        length:"3,60 m",
         seats:3,
         image:[volkswagen,volkswagen1,volkswagen2]
     },
@@ -19,10 +22,13 @@ export const Vehicles =[
         id:2,
         name:"IVECO Transporter lang-Version",
         price:120,
-        payload:"1200 kg",
+        payload:"1280 kg",
         fuel:"Diesel",
         transmission:"Manual",
-        seats:3,
+        width:"1,75 m",
+        height:"2.10 m",
+        length:"3,5 m",
+        seats:2,
         image:[iveo,]
     },
 {
@@ -32,6 +38,9 @@ export const Vehicles =[
     payload:"810 kg",
     fuel:"Diesel",
     transmission:"Manual",
+    width:"1,75 m",
+    height:"2.13 m",
+    length:"4.20 m",
     seats:3,
     image:[mercedes,mercedes1]
 }
