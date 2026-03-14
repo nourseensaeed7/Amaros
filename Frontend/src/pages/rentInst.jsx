@@ -34,12 +34,12 @@ const rentInst = () => {
   return (
     <section>
       <Nav />
-      <div className="mt-20 ">
+      <div className="mt-20 text-amber-950 ">
         <div className="flex flex-col justify-center items-center">
-          <h1 className="text-4xl font-medium my-2 text-center bg-gradient-to-r from-yellow-700/90  to-yellow-600/80 text-transparent bg-clip-text">
+          <h1 className='text-3xl md:text-3xl font-medium my-2  text-center bg-gradient-to-r from-yellow-700/90  to-yellow-600/80 text-transparent bg-clip-text'>
             So mietest du einen Van bei Amaros
           </h1>
-          <p className="text-lg text-center">
+          <p className='text-sm font-bold md:text-base lg:text-lg text-center'>
             Die Anmietung bei Amaros ist einfach, sicher und komplett digital.
           </p>
         </div>
@@ -47,7 +47,7 @@ const rentInst = () => {
           <ol className="px-10 min-w-[70%] space-y-5">
             {rentalSteps.map((step, index) => (
               <li key={index}>
-                <h2 className="text-2xl font-semibold text-yellow-800">
+                <h2 className="text-2xl font-semibold ">
                   {index + 1}.{step.title}
                 </h2>
                 <p className="indent text-xl">{step.description}</p>

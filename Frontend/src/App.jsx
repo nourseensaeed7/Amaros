@@ -13,6 +13,7 @@ import ScrollToTop from "./ScrollToTop";
 import Imprint from "./pages/Imprint.jsx";
 import Policy from "./pages/Policy.jsx";
 import Terms from "./pages/Terms.jsx";
+import About from "./pages/About.jsx";
 const App = () => {
   return (
     <HashRouter>
@@ -26,6 +27,7 @@ const App = () => {
         <Route path="/Imprint"element={<Imprint/>}/>
         <Route path="/Policy"element={<Policy/>}/>
         <Route path="/Terms"element={<Terms/>}/>
+        <Route path="/about-us"element={<About/>}/>
       </Routes>
     </HashRouter>
   );

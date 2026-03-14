@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
-import { FaFileAlt } from "react-icons/fa";
-import { FaHandshake } from "react-icons/fa";
 import { FaMapMarkerAlt } from "react-icons/fa";
-import { FaClock } from "react-icons/fa";
+import { FaUserClock } from "react-icons/fa6";
 import header from "../assets/header.jpeg";
+import { FcSurvey } from "react-icons/fc";
+import { FcOk } from "react-icons/fc";
 
 function Typewriter({ text, speed = 100 }) {
   const [displayedText, setDisplayedText] = useState("");
@@ -26,23 +26,20 @@ const Header = () => {
   return (
     <header className="flex flex-col-reverse justify-center  md:flex-row w-full  ">
       <div
-        className="
-        w-full lg:w-1/2
-        px-4 sm:px-6 lg:px-12
-        py-8 lg:py-0
+        className="min-w-1/2
+        p-5 lg:pl-15 
         flex flex-col
         justify-center
         gap-4
         z-10
       "
       >
-        <h2 className="text-xl  sm:text-2xl md:text-xl lg:text-2xl tracking-wide">
+        <h2 className="text-xl  sm:text-xl md:text-lg lg:text-2xl tracking-wide">
           <Typewriter text="Brauchst du einen Lieferwagen?" />
         </h2>
-
         <h1
           className="
-        text-4xl sm:text-5xl md:text-5xl lg:text-[3rem]
+        text-5xl  md:text-[40px] lg:text-[55px]
         cinzel
         bg-gradient-to-r
         from-yellow-700
@@ -56,17 +53,15 @@ const Header = () => {
 
         {/* FEATURES */}
 
-        <ul className=" max-w-xl ">
+        <ul className=" max-w-xl p-3">
           {/* item */}
           <li className="space-y-1">
-            <div className="flex items-start gap-3 text-yellow-700 font-semibold">
-              <FaClock className="text-base sm:text-lg text-white drop-shadow shrink-0 mt-1" />
-
+            <div className="flex items-center gap-1 text-yellow-700 font-semibold">
+              <FaUserClock className="text-xl md:text-xl ml-1" />
               <h3 className="text-xl md:text-base lg:text-xl ">
                 Unkompliziert & flexibel
               </h3>
             </div>
-
             <p className="text-base md:text-sm lg:text-base text-gray-700 pl-7">
               Selbstabholung und Rückgabe – genau dann, wenn es für dich passt.
             </p>
@@ -74,14 +69,12 @@ const Header = () => {
 
           {/* item */}
           <li className="space-y-1">
-            <div className="flex items-start gap-3 text-yellow-700 font-semibold">
-              <FaHandshake className="text-base sm:text-lg shrink-0 mt-1" />
-
+            <div className="flex items-center gap-1 text-yellow-700 font-semibold">
+              <FcOk  className="text-xl md:text-xl" />
               <h3 className="text-xl md:text-base lg:text-xl ">
                 Transporthilfe inklusive
               </h3>
             </div>
-
             <p className="text-base md:text-sm lg:text-base text-gray-700 pl-7">
               Auf Wunsch bekommst du die Unterstützung, die du brauchst.
             </p>
@@ -89,14 +82,12 @@ const Header = () => {
 
           {/* item */}
           <li className="space-y-1">
-            <div className="flex items-start gap-3 text-yellow-700 font-semibold">
-              <FaFileAlt className="text-base sm:text-lg text-white drop-shadow shrink-0 mt-1" />
-
+            <div className="flex items-start md:items-center  gap-1 text-yellow-700 font-semibold">
+              <FcSurvey  className="text-3xl md:text-2xl " />
               <h3 className="text-xl md:text-base lg:text-xl ">
                 Kein Papierkram. Keine versteckten Gebühren.
               </h3>
             </div>
-
             <p className="text-base md:text-sm lg:text-base text-gray-700 pl-7">
               Nur dein Lieferwagen — sofort verfügbar.
             </p>
@@ -104,14 +95,12 @@ const Header = () => {
 
           {/* item */}
           <li className="space-y-1">
-            <div className="flex items-start gap-3 text-yellow-700 font-semibold">
-              <FaMapMarkerAlt className="text-base sm:text-lg text-red-600 shrink-0 mt-1" />
-
+            <div className="flex items-center gap-1 text-yellow-700 font-semibold">
+              <FaMapMarkerAlt className="text-xl md:text-xl text-red-600 " />
               <h3 className="text-xl md:text-base lg:text-xl ">
                 Top-Lage in Niederhasli
               </h3>
             </div>
-
             <p className="text-base md:text-sm lg:text-base text-gray-700 pl-7">
               Mandachstrasse 50, 8155 Niederhasli
             </p>
@@ -130,7 +119,7 @@ const Header = () => {
       >
         <div
           className="absolute inset-0
-         bg-[linear-gradient(to_right,#f5f5f5_0%,transparent_60%),linear-gradient(to_top,#f5f5f5_5%,transparent_60%),linear-gradient(to_left,#f5f5f5_0%,transparent_60%)]"
+         bg-[linear-gradient(to_right,#f5f5f5_0%,transparent_40%),linear-gradient(to_top,#f5f5f5_5%,transparent_40%),linear-gradient(to_left,#f5f5f5_0%,transparent_30%)]"
         ></div>
       </div>
     </header>

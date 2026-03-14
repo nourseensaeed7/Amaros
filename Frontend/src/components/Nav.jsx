@@ -33,12 +33,12 @@ const Navbar = () => {
             </div>
           </Link>
           {/* Desktop Menu */}
-          <ul className="hidden items-center text-lg md:flex gap-8 font-medium">
+          <ul className="hidden items-center text-lg lg:flex gap-8 font-medium">
             <li className="cursor-pointer transition-all duration-400 ease-in-out hover:bg-gradient-to-r from-yellow-700 via-yellow-500 to-yellow-800 hover:text-transparent bg-clip-text">
               <Link to="/">Home</Link>
             </li>
             <li className="cursor-pointer transition-all duration-400 ease-in-out hover:bg-gradient-to-r from-yellow-700 via-yellow-500 to-yellow-800 hover:text-transparent bg-clip-text">
-              <a href="">Über uns</a>
+              <a onClick={()=>navigate('/about-us')}>Über uns</a>
             </li>
             <li className="cursor-pointer transition-all duration-400 ease-in-out hover:bg-gradient-to-r from-yellow-700 via-yellow-500 to-yellow-800 hover:text-transparent bg-clip-text">
               <a onClick={() => navigate("/vans")}>Alle Lieferwagen</a>
@@ -61,7 +61,7 @@ const Navbar = () => {
           </ul>
 
           {/* Mobile Icon */}
-          <button className="md:hidden text-2xl" onClick={() => setOpen(true)}>
+          <button className="lg:hidden text-2xl" onClick={() => setOpen(true)}>
             <FaBars />
           </button>
         </div>
@@ -71,7 +71,7 @@ const Navbar = () => {
       <div
         className={`
           fixed top-0 right-0 h-full w-64
-          bg-white shadow-xl
+          bg-amber-50 text-amber-950 shadow-xl
           transform transition-transform duration-300
           ${open ? "translate-x-0" : "translate-x-full"}
           z-50
@@ -88,7 +88,7 @@ const Navbar = () => {
             <Link to="/">Home</Link>
           </li>
             <li className="cursor-pointer transition-all duration-400 ease-in-out hover:bg-gradient-to-r from-yellow-700 via-yellow-500 to-yellow-800 hover:text-transparent bg-clip-text">
-            <a href="">Über uns</a>
+            <a onClick={()=>navigate('/about-us')}>Über uns</a>
           </li>
             <li className="cursor-pointer transition-all duration-400 ease-in-out hover:bg-gradient-to-r from-yellow-700 via-yellow-500 to-yellow-800 hover:text-transparent bg-clip-text">
             <a onClick={() => navigate("/vans")}>Alle Lieferwagen</a>
