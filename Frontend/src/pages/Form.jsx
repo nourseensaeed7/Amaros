@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import Flatpickr from "react-flatpickr";
 import "flatpickr/dist/themes/material_blue.css";
 import { supabase } from "../supabaseClient";
@@ -166,6 +166,7 @@ const Form = () => {
   const hourPrice = 20.0;
   const reductionPrice = 12.0;
   const volkasko = 15.0;
+  const navigate=useNavigate();
 
   // ── Form state ──
   const [customerType, setCustomerType] = useState("private");
@@ -284,7 +285,7 @@ const Form = () => {
     return data.publicUrl;
   };
 
-  // ── Submit ──
+// ── Submit ──
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -302,34 +303,34 @@ const Form = () => {
 
     // Upload files
     const passportUrl = await uploadFile(passportFile, "passport");
-    const licenseUrl = await uploadFile(licenseFile, "license");
+    const licenseUrl  = await uploadFile(licenseFile, "license");
     if (!passportUrl || !licenseUrl)
       return alert("Fehler beim Hochladen der Dateien.");
 
     try {
-      // Insert customer
+      // ── Insert customer ──────────────────────────────────────────────────
       const { data: customer, error: customerError } = await supabase
         .from("customers")
         .insert([
           {
-            customer_type: customerType,
-            firma_name: customerType === "firma" ? firmaName : null,
-            first_name: firstName,
-            last_name: lastName,
-            email: email,
-            phone: phone,
-            mobile: mobile,
-            birthdate: birthdate,
-            license_no: licenseNo,
+            customer_type:      customerType,
+            firma_name:         customerType === "firma" ? firmaName : null,
+            first_name:         firstName,
+            last_name:          lastName,
+            email:              email,
+            phone:              phone,
+            mobile:             mobile,
+            birthdate:          birthdate,
+            license_no:         licenseNo,
             license_issue_date: licenseIssuedate,
-            license_category: licenseCategory,
-            passport_url: passportUrl,
-            license_url: licenseUrl,
-            address: strasse,
-            zip: zip,
-            nationality: nationallity,
-            resident_country: residentCountry, 
-            id_passport: ID,
+            license_category:   licenseCategory,
+            passport_url:       passportUrl,
+            license_url:        licenseUrl,
+            address:            strasse,
+            zip:                zip,
+            nationality:        nationallity,
+            resident_country:   residentCountry,
+            id_passport:        ID,
           },
         ])
         .select()
@@ -337,34 +338,37 @@ const Form = () => {
 
       if (customerError) throw new Error(customerError.message);
 
-      // Insert reservation
-      const { error: reservationError } = await supabase
-        .from("reservations")
-        .insert([
-          {
-            customer_id: customer.id,
-            car_id: Number(id),
-            reservation_date: startDate,
-            start_date: startDate,
-            end_date: endDate,
-            haftpflicht_reduktion: redu,
-            vollkasko_reduktion: insuRedu,
-            extra_km: kmActive ? km : 0,
-            extra_km_price: kmActive ? totalKmPrice : 0,
-            extra_hours: hourActive ? hour : 0,
-            extra_hours_price: hourActive ? totalHoursPrice : 0,
-            extra_total: extraTotal,
-            total_price: total,
-            km_active: kmActive,
-            hour_active: hourActive,
-          },
-        ]);
+const { data: reservation, error: reservationError } = await supabase
+  .from("reservations")
+  .insert([
+    {
+      customer_id:           customer.id,
+      car_id:                Number(id),
+      reservation_date:      startDate,
+      start_date:            startDate,
+      end_date:              endDate,
+      haftpflicht_reduktion: redu,
+      vollkasko_reduktion:   insuRedu,
+      extra_km:              kmActive ? km : 0,
+      extra_km_price:        kmActive ? totalKmPrice : 0,
+      extra_hours:           hourActive ? hour : 0,
+      extra_hours_price:     hourActive ? totalHoursPrice : 0,
+      extra_total:           extraTotal,
+      total_price:           total,
+      km_active:             kmActive,
+      hour_active:           hourActive,
+      contract_status:       "pending",
+      contract_path:         null,
+      signed_contract_path:  null,
+      signed_at:             null,
+    },
+  ])
+  .select()   // ← must have this
+  .single();  // ← must have this
 
-      if (reservationError) throw new Error(reservationError.message);
+if (reservationError) throw new Error(reservationError.message);
 
-      alert("Reservierung erfolgreich!");
-
-      // Reset form — FIX: added setResidentCountry("")
+      // ── Reset form ───────────────────────────────────────────────────────
       setCustomerType("private");
       setFirmaName("");
       setFirstName("");
@@ -381,8 +385,8 @@ const Form = () => {
       setZip("");
       setID("");
       setNationallity("");
-      setMobile("")
-      setResidentCountry(""); 
+      setMobile("");
+      setResidentCountry("");
       setStartDate(null);
       setEndDate(null);
       setRedu(false);
@@ -394,6 +398,13 @@ const Form = () => {
       setTerms(false);
       setTotalPrice(0);
       loadReservedDates();
+
+      // ── Navigate to signing page ─────────────────────────────────────────
+      // Pass the new reservation ID so SignContract can load the correct PDF
+      navigate(`/Van-Form/${id}/sign-contract`, {
+        state: { reservationId: reservation.id },
+      });
+
     } catch (err) {
       console.error(err);
       alert("Fehler beim Speichern der Reservierung: " + err.message);
@@ -825,8 +836,7 @@ const Form = () => {
               <div className="bg-white w-11/12 md:w-3/4 lg:w-1/2 h-4/5 md:h-3/4 rounded-lg shadow-lg flex flex-col">
                 <h2 className="text-xl font-bold p-4 border-b">Terms and Conditions</h2>
                 <div className="flex-1 overflow-auto p-4">
-                  <embed src="/terms.pdf" type="application/pdf" width="100%" height="100%" />
-                </div>
+                <embed src="terms.pdf" type="application/pdf" width="100%" height="100%" />                </div>
                 <div className="p-4 flex justify-end space-x-2 border-t">
                   <button
                     className="bg-green-600 text-white px-4 py-2 rounded-md"
@@ -848,20 +858,6 @@ const Form = () => {
           {/* ── Submit Button ── */}
           <button
             type="submit"
-            disabled={
-              !isAgeValid() ||
-              !startDate ||
-              !endDate ||
-              !passportFile ||
-              !licenseFile ||
-              !firstName ||
-              !lastName ||
-              !email ||
-              !phone ||
-              !nationallity ||
-              !residentCountry ||
-              !terms
-            }
             className="bg-yellow-900 text-white p-3 rounded-lg mt-3 cursor-pointer disabled:cursor-auto disabled:opacity-50"
           >
             Jetzt Reservieren
