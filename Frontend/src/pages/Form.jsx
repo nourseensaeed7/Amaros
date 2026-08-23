@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import Flatpickr from "react-flatpickr";
 import "flatpickr/dist/themes/material_blue.css";
 import { supabase } from "../supabaseClient";
-import { Vehicles } from "../data/Vehicles";
+import { useVehicles } from "../hooks/useVehicles";
 import Nav from "../components/Nav";
 import Footer from "../components/Footer.jsx";
 import PageLoader from "../components/PageLoader";
@@ -160,7 +160,8 @@ function CountryDropdown({
 
 const Form = () => {
   const { id } = useParams();
-  const vehicle = Vehicles.find((v) => v.id === Number(id));
+  const { vehicles, loading: vehiclesLoading, error: vehiclesError } = useVehicles();
+  const vehicle = vehicles.find((v) => v.id === Number(id));
 
   const kmPrice = 0.6;
   const hourPrice = 20.0;
@@ -233,7 +234,7 @@ const Form = () => {
 
   // ── Price calculation ──
   const calculatePrice = (start, end) => {
-    if (!start || !end) { setTotalPrice(0); return; }
+    if (!start || !end || !vehicle) { setTotalPrice(0); return; }
     const diffDays =
       Math.ceil((new Date(end) - new Date(start)) / (1000 * 60 * 60 * 24)) + 1;
     setTotalPrice(diffDays * vehicle.price);
@@ -410,6 +411,29 @@ if (reservationError) throw new Error(reservationError.message);
       alert("Fehler beim Speichern der Reservierung: " + err.message);
     }
   };
+
+  // Vehicle data hasn't arrived from Supabase yet
+  if (vehiclesLoading) {
+    return (
+      <PageLoader>
+        <section>
+          <Nav />
+        </section>
+      </PageLoader>
+    );
+  }
+
+  // Fetch failed, or no vehicle matches this id
+  if (vehiclesError || !vehicle) {
+    return (
+      <PageLoader>
+        <section>
+          <Nav />
+          <p className="text-center my-20">Fahrzeug nicht gefunden.</p>
+        </section>
+      </PageLoader>
+    );
+  }
 
   return (
     <PageLoader>

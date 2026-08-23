@@ -8,8 +8,27 @@ const SUPABASE_URL         = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SB_SERVICE_KEY")!;
 const RESEND_API_KEY       = Deno.env.get("RESEND_API_KEY")!;
 const OWNER_EMAIL          = Deno.env.get("OWNER_EMAIL") ?? "nourseensaeed7@gmail.com";
-const TEMPLATE_PATH        = "templates/VW Crafter FahrzeugmietvertragFillable.pdf";
 const STORAGE_BUCKET       = "contracts";
+
+// ── Per-car contract templates ────────────────────────────────────────────
+// Key = vehicle.name exactly as it's stored in the `vehicles` table.
+// Value = path of that car's fillable PDF template inside the "contracts" bucket.
+// Add/edit entries here whenever you upload a new template.
+const TEMPLATES: Record<string, string> = {
+  "VW Crafter": "templates/VW_Crafter_Fahrzeugmietvertrag_fillable.pdf",
+  "Iveco Daily": "templates/Iveco_Daily_Fahrzeugmietvertrag_fillable.pdf",
+  "MB Sprinter": "templates/MB_Sprinter_Fahrzeugmietvertrag_fillable.pdf",
+};
+
+// Turns a vehicle name into a safe, consistent folder name.
+// e.g. "VW Crafter" -> "vw-crafter"
+function slugify(name: string): string {
+  return name
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
 
 serve(async (req) => {
   try {
@@ -46,10 +65,19 @@ serve(async (req) => {
       throw new Error(`Vehicle not found: ${carError?.message}`);
     }
 
-    // ── 3. Download PDF template ─────────────────────────────────────────────
+    // ── 3. Pick this car's template and download it ─────────────────────────
+    const templatePath = TEMPLATES[vehicle.name];
+
+    if (!templatePath) {
+      throw new Error(
+        `No contract template configured for vehicle "${vehicle.name}". ` +
+        `Add it to the TEMPLATES map in index.ts.`
+      );
+    }
+
     const { data: templateData, error: dlError } = await sb.storage
       .from(STORAGE_BUCKET)
-      .download(TEMPLATE_PATH);
+      .download(templatePath);
 
     if (dlError || !templateData) {
       throw new Error(`Template download failed: ${dlError?.message}`);
@@ -71,6 +99,22 @@ serve(async (req) => {
       }
     };
 
+    // Sets one half of a Ja/Nein (or similar two-way) checkbox pair.
+    const setYesNo = (yesField: string, noField: string, isYes: boolean) => {
+      try {
+        const yes = form.getCheckBox(yesField);
+        isYes ? yes.check() : yes.uncheck();
+      } catch {
+        // checkbox not found — skip
+      }
+      try {
+        const no = form.getCheckBox(noField);
+        !isYes ? no.check() : no.uncheck();
+      } catch {
+        // checkbox not found — skip
+      }
+    };
+
     const fmtDate = (d: string) => {
       if (!d) return "";
       const [y, m, day] = d.split("-");
@@ -80,54 +124,73 @@ serve(async (req) => {
     const fmtChf = (n: number | null) =>
       n != null && n > 0 ? `CHF ${Number(n).toFixed(2)}` : "-";
 
-    const bookingRef = String(reservation.id).padStart(6, "0");
+    const bookingRef  = String(reservation.id).padStart(6, "0");
+    // No dedicated "protokoll_Nr" column exists yet — reusing bookingRef.
+    const protokollNr = bookingRef;
+
+    const rentalDays = (() => {
+      if (!reservation.start_date || !reservation.end_date) return "";
+      const start = new Date(reservation.start_date);
+      const end   = new Date(reservation.end_date);
+      const days  = Math.max(1, Math.round((end.getTime() - start.getTime()) / 86400000) + 1);
+      return String(days);
+    })();
+
+    const grundpreis = (reservation.total_price ?? 0) - (reservation.extra_total ?? 0);
 
     // ── Contract header ──────────────────────────────────────────────────────
-    fill("contract_id",            bookingRef,                              9);
+    fill("protokoll_Nr",              protokollNr,                            9);
 
     // ── Customer info ────────────────────────────────────────────────────────
-    fill("company",                customer.firma_name          ?? "",      8);
-    fill("name",                   customer.last_name           ?? "",      8);
-    fill("vorname",                customer.first_name          ?? "",      8);
-    fill("id",                     customer.id_passport         ?? "",      8);
-    fill("street",                 customer.address             ?? "",      8);
-    fill("plz",                    customer.zip                 ?? "",      8);
-    fill("stadt",                  customer.resident_country    ?? "",      8);
-    fill("gueltig_bis",            fmtDate(customer.license_issue_date),   8);
-    fill("tel_nummer",             customer.phone               ?? "",      8);
-    fill("mobile",                 customer.mobile              ?? "",      8);
-    fill("geburtsdatum",           fmtDate(customer.birthdate),            8);
-    fill("fuehrerschein_nr",       customer.license_no          ?? "",      8);
-    fill("ausstellungsort",        fmtDate(customer.license_issue_date),   8);
-    fill("nationality",            customer.nationality         ?? "",      8);
+    fill("kunde_firma",               customer.firma_name          ?? "",     8);
+    fill("kunde_ansprechpartner",     "",                                     8); // no data source yet
+    fill("kunde_name",                customer.last_name           ?? "",     8);
+    fill("kunde_vorname",             customer.first_name          ?? "",     8);
+    fill("kunde_strasse",             customer.address             ?? "",     8);
+    fill("kunde_plz",                 customer.zip                 ?? "",     8);
+    fill("kunde_ort",                 customer.resident_country    ?? "",     8);
+    fill("kunde_fuehrerschein_nr",    customer.license_no          ?? "",     8);
+    fill("kunde_mobile",              customer.mobile              ?? "",     8);
 
     // ── Rental period ────────────────────────────────────────────────────────
-    fill("abholungsdatum",         fmtDate(reservation.start_date),        8);
-    fill("pickup_hr",              "08:00",                                 8);
-    fill("rueckgabedatum",         fmtDate(reservation.end_date),          8);
-    fill("return_hr",              "17:00",                                 8);
+    fill("vertrag_datum",             fmtDate(reservation.start_date),        8);
+    fill("abholungsdatum",            fmtDate(reservation.start_date),        8);
+    fill("abholungszeit_soll",        "08:00",                                8);
+    fill("rueckgabedatum",            fmtDate(reservation.end_date),          8);
+    fill("rueckgabezeit_soll",        "17:00",                                8);
+    fill("abholungsort",              "Niederhasli",                          8);
+    fill("rueckgabeort",              "Niederhasli",                          8);
+    fill("auslandfahrt",              "Nein",                                 8); // no column yet
 
     // ── Costs ────────────────────────────────────────────────────────────────
-    fill("no_extra_km",            String(reservation.extra_km    ?? 0),   8);
-    fill("extra_km",               fmtChf(reservation.extra_km_price),     8);
-    fill("no_extra_hr",            String(reservation.extra_hours ?? 0),   8);
-    fill("extra_hour",             fmtChf(reservation.extra_hours_price),  8);
-    fill("perm_foriegn",           "-",                                     8);
-    fill("foriegn_trip",           "Nein",                                  8);
-    fill("reduktion",              reservation.haftpflicht_reduktion ? "CHF 12.00" : "-", 8);
-    fill("redu_volkasko",          reservation.vollkasko_reduktion   ? "CHF 15.00" : "-", 8);
-    fill("total_price",            fmtChf(reservation.total_price),        8);
+    fill("grundpreis_chf",            fmtChf(grundpreis),                     8);
+    fill("posten_anzahl",             rentalDays,                             8);
+    fill("inkl_km",                   "-",                                    8); // no column yet
+    fill("zusaetzlich_gebucht_km",    String(reservation.extra_km    ?? 0),   8);
+    fill("zusaetzlich_gebuchte_stunden", String(reservation.extra_hours ?? 0), 8);
+    fill("total_price",               fmtChf(reservation.total_price),        8);
 
-    // ── Signatures ───────────────────────────────────────────────────────────
-    fill("our_company_es_:sender", "Amaros Inh. Soliman",                  8);
-    fill("customer_sign",          "",                                      8);
+    // ── Insurance checkboxes ─────────────────────────────────────────────────
+    setYesNo("sb_haftpflicht_ja",     "sb_haftpflicht_nein",  !!reservation.haftpflicht_reduktion);
+    setYesNo("sb_vollkasko_ja",       "sb_vollkasko_nein",    !!reservation.vollkasko_reduktion);
+    setYesNo("vollkasko_ja",          "vollkasko_nein",       !!reservation.vollkasko);
+    setYesNo("versicherung_vollkasko","versicherung_teilkasko", !!reservation.vollkasko);
+
+    // ── Extras (free text, no data source yet) ──────────────────────────────
+    fill("kurzbeschreibung_transportgueter", "",                              8);
+    fill("geplante_route",                   "",                              8);
+
+    // ── Signature ─────────────────────────────────────────────────────────────
+    fill("kunde_unterschrift",        "",                                      8);
 
     // ── 5. Flatten fields (read-only) + save PDF ─────────────────────────────
     form.flatten();
     const filledPdfBytes = await pdfDoc.save();
 
     // ── 6. Upload filled PDF to Supabase Storage ─────────────────────────────
-    const storagePath = `${reservation.id}/Mietvertrag_${bookingRef}.pdf`;
+    // Layout: contracts/<car-slug>/<protokoll-nr>/Mietvertrag_<ref>.pdf
+    const carFolder   = slugify(vehicle.name);
+    const storagePath = `${carFolder}/${protokollNr}/Mietvertrag_${bookingRef}.pdf`;
 
     const { error: uploadError } = await sb.storage
       .from(STORAGE_BUCKET)

@@ -1,6 +1,6 @@
 import { React, useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Vehicles } from "../data/Vehicles.js";
+import { useVehicles } from "../hooks/useVehicles";
 import { BsFuelPumpDiesel } from "react-icons/bs";
 import { TbManualGearbox } from "react-icons/tb";
 import { MdAirlineSeatReclineNormal } from "react-icons/md";
@@ -14,23 +14,51 @@ import PageLoader from "../components/PageLoader";
 const Details = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const vehicle = Vehicles.find((v) => v.id === Number(id));
+  const { vehicles, loading, error } = useVehicles();
+  const vehicle = vehicles.find((v) => v.id === Number(id));
   // Carousel state
   const [currentImage, setCurrentImage] = useState(0);
 
   // Handle next image
   const nextImage = () => {
+    if (!vehicle) return;
     setCurrentImage((prev) => (prev + 1) % vehicle.image.length);
   };
   const prevImage = () => {
+    if (!vehicle) return;
     setCurrentImage((prev) => (prev - 1 + vehicle.image.length) % vehicle.image.length);
   };
 
   // Auto-slide every 2 seconds
   useEffect(() => {
+    if (!vehicle) return;
     const interval = setInterval(nextImage, 10000);
     return () => clearInterval(interval);
-  }, []);
+  }, [vehicle]);
+
+  // Data hasn't arrived from Supabase yet
+  if (loading) {
+    return (
+      <PageLoader>
+        <section>
+          <Nav />
+        </section>
+      </PageLoader>
+    );
+  }
+
+  // Fetch failed, or no vehicle matches this id
+  if (error || !vehicle) {
+    return (
+      <PageLoader>
+        <section>
+          <Nav />
+          <p className="text-center my-20">Fahrzeug nicht gefunden.</p>
+        </section>
+      </PageLoader>
+    );
+  }
+
   return (
     <PageLoader>
     <section>
