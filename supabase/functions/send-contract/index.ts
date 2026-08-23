@@ -15,7 +15,7 @@ const STORAGE_BUCKET       = "contracts";
 // Value = path of that car's fillable PDF template inside the "contracts" bucket.
 // Add/edit entries here whenever you upload a new template.
 const TEMPLATES: Record<string, string> = {
-  "VW Crafter": "templates/VW_Crafter_Fahrzeugmietvertrag_fillable.pdf",
+  "VW Crafter":  "templates/VW Crafter FahrzeugmietvertragFillable.pdf",
   "Iveco Daily": "templates/Iveco_Daily_Fahrzeugmietvertrag_fillable.pdf",
   "MB Sprinter": "templates/MB_Sprinter_Fahrzeugmietvertrag_fillable.pdf",
 };
@@ -46,7 +46,7 @@ serve(async (req) => {
     // ── 1. Fetch customer ────────────────────────────────────────────────────
     const { data: customer, error: custError } = await sb
       .from("customers")
-      .select("*")
+      .select("*")          // ← back to *, not x
       .eq("id", reservation.customer_id)
       .single();
 
@@ -122,7 +122,7 @@ serve(async (req) => {
     };
 
     const fmtChf = (n: number | null) =>
-      n != null && n > 0 ? `CHF ${Number(n).toFixed(2)}` : "-";
+      n != null && n > 0 ? `${Number(n).toFixed(2)}` : "-";
 
     const bookingRef  = String(reservation.id).padStart(6, "0");
     // No dedicated "protokoll_Nr" column exists yet — reusing bookingRef.
@@ -136,7 +136,16 @@ serve(async (req) => {
       return String(days);
     })();
 
-    const grundpreis = (reservation.total_price ?? 0) - (reservation.extra_total ?? 0);
+    // Per-unit rates — must match what Form.jsx uses to compute extra_km_price / extra_hours_price
+    const KM_RATE          = 0.60;
+    const HOUR_RATE        = 20.00;
+    const HAFTPFLICHT_RATE = 12.00; // per day
+    const VOLLKASKO_RATE   = 31.00; // per day (always included)
+    const SB_VOLLKASKO_RATE = 15.00; // per day
+
+    const days = Number(rentalDays) || 0;
+    const grundpreisRate  = vehicle.price_per_day ?? 0;      // CHF per day
+    const grundpreisTotal = grundpreisRate * days;            // Grundpreis row total
 
     // ── Contract header ──────────────────────────────────────────────────────
     fill("protokoll_Nr",              protokollNr,                            9);
@@ -163,12 +172,40 @@ serve(async (req) => {
     fill("auslandfahrt",              "Nein",                                 8); // no column yet
 
     // ── Costs ────────────────────────────────────────────────────────────────
-    fill("grundpreis_chf",            fmtChf(grundpreis),                     8);
-    fill("posten_anzahl",             rentalDays,                             8);
-    fill("inkl_km",                   "-",                                    8); // no column yet
-    fill("zusaetzlich_gebucht_km",    String(reservation.extra_km    ?? 0),   8);
+    // Grundpreis = per-day vehicle rate (NOT the total)
+    fill("grundpreis_chf",              fmtChf(grundpreisRate),                 8);
+    fill("grundpreis_zeile_total_chf",  fmtChf(grundpreisTotal),                8);
+    fill("posten_anzahl",               rentalDays,                            8); // Crafter / Iveco
+    fill("palettenrolli_anzahl",        rentalDays,                            8); // MB Sprinter (same meaning: rental days)
+    fill("inkl_km",                     "-",                                    8); // no column yet
+    fill("zusaetzlich_gebucht_km",      String(reservation.extra_km    ?? 0),  8);
     fill("zusaetzlich_gebuchte_stunden", String(reservation.extra_hours ?? 0), 8);
-    fill("total_price",               fmtChf(reservation.total_price),        8);
+
+    // Zuschlag pro km / Std — only show a price if the customer actually added it
+    fill("zuschlag_pro_km_chf",         reservation.km_active   ? fmtChf(KM_RATE)   : "-", 8);
+    fill("zuschlag_pro_km_total_chf",   reservation.km_active   ? fmtChf(reservation.extra_km_price)    : "-", 8);
+    fill("zuschlag_pro_std_chf",        reservation.hour_active ? fmtChf(HOUR_RATE) : "-", 8);
+    fill("zuschlag_pro_std_total_chf",  reservation.hour_active ? fmtChf(reservation.extra_hours_price) : "-", 8);
+
+    // Selbstbehalt-Reduktionen — rate always shown, total only if selected
+    fill("sb_haftpflicht_rate_chf",     fmtChf(HAFTPFLICHT_RATE),               8);
+    fill("sb_haftpflicht_total_chf",    reservation.haftpflicht_reduktion ? fmtChf(HAFTPFLICHT_RATE * days) : "-", 8);
+    fill("vollkasko_rate_chf",          fmtChf(VOLLKASKO_RATE),                 8); // always included
+    fill("sb_vollkasko_rate_chf",       fmtChf(SB_VOLLKASKO_RATE),              8);
+    fill("sb_vollkasko_total_chf",      reservation.vollkasko_reduktion ? fmtChf(SB_VOLLKASKO_RATE * days) : "-", 8);
+
+    // Auslandsfahrtbewilligung / Palettenrolli — no reservation column/toggle yet, always "-"
+    fill("auslandsfahrtbewilligung_chf",       "-", 8);
+    fill("auslandsfahrtbewilligung_total_chf", "-", 8);
+    fill("palettenrolli_chf",                  "-", 8);
+    fill("palettenrolli_total_chf",            "-", 8);
+
+    fill("bezahlter_betrag_chf",        " 0.00",                             8); // nothing marked as paid yet
+    // rabatt_chf intentionally left blank — no discount logic yet
+
+    fill("total_price",                 fmtChf(reservation.total_price),        8); // older templates only
+    fill("gesamt_offener_betrag_chf",   fmtChf(reservation.total_price),        8); // current template
+    // vollmacht_chf / kaution_chf (Iveco only) intentionally left blank — filled in by staff
 
     // ── Insurance checkboxes ─────────────────────────────────────────────────
     setYesNo("sb_haftpflicht_ja",     "sb_haftpflicht_nein",  !!reservation.haftpflicht_reduktion);
