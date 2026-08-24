@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import Flatpickr from "react-flatpickr";
 import "flatpickr/dist/themes/material_blue.css";
 import { supabase } from "../supabaseClient";
-import { useVehicles } from "../hooks/useVehicles";
+import { useVehicles } from "../hooks/useVehicles.js";
 import Nav from "../components/Nav";
 import Footer from "../components/Footer.jsx";
 import PageLoader from "../components/PageLoader";

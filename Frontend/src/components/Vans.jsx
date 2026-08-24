@@ -1,5 +1,5 @@
 import React from 'react'
-import { useVehicles } from "../hooks/useVehicles";
+import { useVehicles } from "../hooks/useVehicles.js";
 import PageLoader from "./PageLoader";
 import Cards from './Cards'
 

@@ -1,6 +1,6 @@
 import { React, useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useVehicles } from "../hooks/useVehicles";
+import { useVehicles } from "../hooks/useVehicles.js";
 import { BsFuelPumpDiesel } from "react-icons/bs";
 import { TbManualGearbox } from "react-icons/tb";
 import { MdAirlineSeatReclineNormal } from "react-icons/md";
