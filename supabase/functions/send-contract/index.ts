@@ -15,7 +15,7 @@ const STORAGE_BUCKET       = "contracts";
 // Value = path of that car's fillable PDF template inside the "contracts" bucket.
 // Add/edit entries here whenever you upload a new template.
 const TEMPLATES: Record<string, string> = {
-  "VW Crafter":  "templates/VW Crafter FahrzeugmietvertragFillable.pdf",
+  "VW Crafter":  "templates/VW_Crafter_FahrzeugmietvertragFillable.pdf",
   "Iveco Daily": "templates/Iveco_Daily_Fahrzeugmietvertrag_fillable.pdf",
   "MB Sprinter": "templates/MB_Sprinter_Fahrzeugmietvertrag_fillable.pdf",
 };

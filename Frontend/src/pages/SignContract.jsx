@@ -43,13 +43,19 @@ export default function SignContract() {
 
   const loadContract = async () => {
     try {
-      const { data: res } = await supabase
-        .from("reservations")
-        .select("*, customers(*)")
-        .eq("id", reservationId)
-        .single();
+      // reservations/customers are no longer publicly readable (RLS), so this
+      // goes through the contract-data edge function, which uses the
+      // service role key on the server to fetch them.
+      const { data: loadData, error: loadError } = await supabase.functions.invoke(
+        "contract-data",
+        { body: { action: "load", reservationId } }
+      );
 
-      if (!res) throw new Error("Buchung nicht gefunden.");
+      if (loadError || loadData?.error || !loadData?.reservation) {
+        throw new Error(loadData?.error || "Buchung nicht gefunden.");
+      }
+
+      const res = loadData.reservation;
       setReservation(res);
       setCustomer(res.customers);
 
@@ -60,12 +66,12 @@ export default function SignContract() {
       while (!contractPath && attempts < 15) {
         setLoadingMsg(`Vertrag wird erstellt... (${attempts + 1}/15)`);
         await new Promise((r) => setTimeout(r, 2000));
-        const { data: updated } = await supabase
-          .from("reservations")
-          .select("contract_path")
-          .eq("id", reservationId)
-          .single();
-        contractPath = updated?.contract_path;
+
+        const { data: statusData } = await supabase.functions.invoke(
+          "contract-data",
+          { body: { action: "status", reservationId } }
+        );
+        contractPath = statusData?.contractPath;
         attempts++;
         console.log(`Attempt ${attempts}: contract_path = ${contractPath}`);
       }
@@ -199,12 +205,16 @@ export default function SignContract() {
 
       if (uploadError) throw new Error("Upload fehlgeschlagen.");
 
-      // Update reservation status
-      await supabase.from("reservations").update({
-        contract_status:      "signed_pending_review",
-        signed_contract_path: signedPath,
-        signed_at:            new Date().toISOString(),
-      }).eq("id", reservationId);
+      // Update reservation status — reservations has no public UPDATE policy
+      // anymore, so this goes through the edge function (service role).
+      const { data: completeData, error: completeError } = await supabase.functions.invoke(
+        "contract-data",
+        { body: { action: "complete", reservationId, signedPath } }
+      );
+
+      if (completeError || completeData?.error) {
+        throw new Error(completeData?.error || "Fehler beim Aktualisieren der Buchung.");
+      }
 
       // ✅ Generate download URL for the signed PDF
       const { data: signedUrlData } = await supabase.storage
