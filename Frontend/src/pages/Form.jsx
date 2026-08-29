@@ -1,13 +1,37 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Flatpickr from "react-flatpickr";
-import "flatpickr/dist/themes/material_blue.css";
+import "flatpickr/dist/themes/light.css";   // or: airbnb.css, dark.css, confetti.css, material_green.css...
+import { IoImageOutline } from "react-icons/io5";
+import { LuCalendarDays } from "react-icons/lu";
 import { supabase } from "../supabaseClient";
 import { useVehicles } from "../hooks/useVehicles.js";
 import Nav from "../components/Nav";
 import Footer from "../components/Footer.jsx";
 import PageLoader from "../components/PageLoader";
 // ─── Country List (Wohnsitzland only) ─────────────────────────────────────────
+
+// ─── Toast Notifications ──────────────────────────────────────────────────────
+// A lightweight, themed replacement for the browser's native alert() popup.
+// Stacks in the top-right corner, auto-dismisses after a few seconds, and can
+// be dismissed early by clicking it.
+function ToastContainer({ toasts, onDismiss }) {
+  return (
+    <div className="fixed top-4 right-4 z-[100] flex flex-col gap-2 w-[90vw] max-w-sm">
+      {toasts.map((t) => (
+        <div
+          key={t.id}
+          onClick={() => onDismiss(t.id)}
+          className={`cursor-pointer rounded-lg shadow-lg px-4 py-3 text-sm font-semibold text-white animate-[fadeIn_0.2s_ease-out] ${
+            t.type === "success" ? "bg-green-700" : "bg-red-700"
+          }`}
+        >
+          {t.message}
+        </div>
+      ))}
+    </div>
+  );
+}
 
 const EUROPE_COUNTRIES = [
   "Albania", "Andorra", "Austria", "Belarus", "Belgium", "Bosnia and Herzegovina",
@@ -19,6 +43,49 @@ const EUROPE_COUNTRIES = [
   "Slovenia", "Spain", "Sweden", "Switzerland", "Turkey", "Ukraine",
   "United Kingdom", "Vatican City",
 ];
+
+// ─── Flatpickr calendar visual fixes ─────────────────────────────────────────
+// - Hides the previous/next month "padding" days so only the days that
+//   actually belong to the displayed month are shown (avoids them being
+//   mistaken for disabled/past days).
+// - Gives disabled (past) days a clearly muted look, and makes sure normal
+//   selectable days (including all of next month, once you navigate there)
+//   stay fully visible/dark.
+// - Restyles the default black focus ring on the date input to match the
+//   site's yellow-900 theme.
+function FlatpickrStyleFixes() {
+  return (
+    <style>{`
+      .flatpickr-day.prevMonthDay,
+      .flatpickr-day.nextMonthDay {
+        visibility: hidden;
+        pointer-events: none;
+      }
+      .flatpickr-day {
+        color: #1c1917;
+      }
+      .flatpickr-day.flatpickr-disabled,
+      .flatpickr-day.flatpickr-disabled:hover {
+        color: #d4d4d4 !important;
+        cursor: not-allowed;
+      }
+      .flatpickr-day.today {
+        border-color: #78350f;
+      }
+      .flatpickr-day.selected,
+      .flatpickr-day.selected:hover {
+        background: #78350f;
+        border-color: #78350f;
+      }
+      .flatpickr-input:focus,
+      .flatpickr-input:focus-visible {
+        outline: none !important;
+        box-shadow: 0 0 0 2px rgba(120, 53, 15, 0.3) !important;
+        border-color: #78350f !important;
+      }
+    `}</style>
+  );
+}
 
 function CountryDropdown({
   value,
@@ -81,7 +148,7 @@ function CountryDropdown({
             <span className="text-yellow-900/40 text-sm">🔍</span>
             <input
               ref={inputRef}
-              className="flex-1 bg-transparent outline-none text-sm text-yellow-900 placeholder-yellow-900/40"
+              className="flex-1 bg-transparent outline-none text-sm text-yellow-900 placeholder-yellow-900/40 focus:ring-0"
               placeholder={searchPlaceholder}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
@@ -124,6 +191,97 @@ function CountryDropdown({
   );
 }
 
+// ─── File Upload Field (attachment-card style) ───────────────────────────────
+// Mirrors the "Attachments" pattern from the reference design: an "+ Add File"
+// dashed dropzone-style trigger, and once a file is chosen, a card with a file
+// icon, name, size, and a red "✕" to remove — same yellow-900 theme as the
+// rest of the form.
+//
+// NOTE: this field intentionally does NOT rely on the native HTML5 "required"
+// attribute. The underlying <input type="file"> is visually hidden
+// (display:none), and browsers cannot show their native validation prompt on
+// a hidden element — that can silently block form submission with no visible
+// error at all. Presence is instead enforced explicitly in handleSubmit,
+// where a clear German alert tells the user exactly what's missing.
+function formatFileSize(bytes) {
+  if (bytes < 1024) return `${bytes}b`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)}kb`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)}mb`;
+}
+
+function FileUploadField({ label, file, onChange, accept = "image/*" }) {
+  const inputRef = useRef(null);
+
+  const handleRemove = () => {
+    onChange(null);
+    if (inputRef.current) inputRef.current.value = "";
+  };
+
+  return (
+    <div className="flex flex-col gap-1">
+      <label className="text-xl font-semibold text-yellow-900">{label}</label>
+
+      {file ? (
+        <div className="flex items-center justify-between gap-2 border-2 border-yellow-900/5 bg-white rounded-lg p-2.5">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="shrink-0 flex items-center justify-center w-9 h-9 rounded-md bg-yellow-900/10 text-yellow-900 text-lg">
+              <IoImageOutline />
+            </span>
+            <div className="min-w-0">
+              <p className="text-sm text-yellow-950 truncate">{file.name}</p>
+              <p className="text-xs text-yellow-900/50">{formatFileSize(file.size)}</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleRemove}
+            aria-label={`${label} entfernen`}
+            className="shrink-0 ml-2 text-red-500 hover:text-red-700 font-semibold text-sm cursor-pointer"
+          >
+            ✕
+          </button>
+        </div>
+      ) : (
+        <label className="flex items-center justify-center gap-2 border-2 border-dashed border-yellow-900/20 rounded-lg p-2.5 text-sm text-yellow-900/60 cursor-pointer hover:border-yellow-900/40 hover:bg-yellow-50/50 transition-colors">
+          <span className="text-base leading-none">+</span> Add File
+          <input
+            ref={inputRef}
+            type="file"
+            accept={accept}
+            className="hidden"
+            onChange={(e) => onChange(e.target.files[0] || null)}
+          />
+        </label>
+      )}
+    </div>
+  );
+}
+
+// ─── Date Field (Start / Finish box style) ───────────────────────────────────
+// Mirrors the reference design's "Start" / "Finish" boxes: a small uppercase
+// label, the date value, and a calendar icon on the right — same white box /
+// yellow-900 border theme, still backed by Flatpickr for the actual picking.
+function DateField({ label, value, onChange, options, placeholder }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <label className="text-xl text-yellow-900 font-semibold">{label}</label>
+      <div className="relative">
+        <Flatpickr
+          value={value}
+          onChange={onChange}
+          options={options}
+          placeholder={placeholder}
+          className="w-full p-2 pr-11 bg-white border-2 border-yellow-900/5 rounded-lg outline-none focus:border-yellow-700 focus:ring-2 focus:ring-yellow-700/30"
+        />
+        <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 flex items-center justify-center w-7 h-7 rounded-md bg-yellow-900/10 text-yellow-900 text-sm">
+          <LuCalendarDays />
+
+        </span>
+      </div>
+    </div>
+  );
+}
+
 const Form = () => {
   const { id } = useParams();
   const { vehicles, loading: vehiclesLoading, error: vehiclesError } = useVehicles();
@@ -142,16 +300,16 @@ const Form = () => {
   const [lastName, setLastName] = useState("");
   const [strasse, setStrasse] = useState("");
   const [zip, setZip] = useState("");
-  const [ID, setID] = useState("");
   const [residentCountry, setResidentCountry] = useState("");
   const [email, setEmail] = useState("");
   const [birthdate, setBirthdate] = useState("");
   const [birthError, setBirthError] = useState("");
-  const [phone, setPhone] = useState("");
   const [mobile,setMobile]=useState("")
   const [licenseNo, setLicenseNo] = useState("");
   const [licenseFrontFile, setLicenseFrontFile] = useState(null);
   const [licenseBackFile, setLicenseBackFile] = useState(null);
+  const [IDFrontFile, setIDFrontFile] = useState(null);
+  const [IDBackFile, setIDBackFile] = useState(null);
   const [reservedDates, setReservedDates] = useState([]);
   const [startDate, setStartDate] = useState(null);
   const [endDate, setEndDate] = useState(null);
@@ -165,6 +323,16 @@ const Form = () => {
   const [error, setError] = useState("");
   const [terms, setTerms] = useState(false);
   const [showModal, setShowModal] = useState(false);
+  const [toasts, setToasts] = useState([]);
+
+  const showToast = (message, type = "error") => {
+    const id = Date.now() + Math.random();
+    setToasts((prev) => [...prev, { id, message, type }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 4500);
+  };
+  const dismissToast = (id) => setToasts((prev) => prev.filter((t) => t.id !== id));
 
   const totalKmPrice = km * kmPrice;
   const totalHoursPrice = hourPrice * hour;
@@ -256,25 +424,31 @@ const Form = () => {
 
     // Validation
     if (!isAgeValid())
-      return alert("Der Fahrer muss mindestens 25 Jahre alt sein.");
+      return showToast("Der Fahrer muss mindestens 25 Jahre alt sein.");
     if (!startDate || !endDate)
-      return alert("Bitte wählen Sie Start- und Rückgabedatum.");
+      return showToast("Bitte wählen Sie Start- und Rückgabedatum.");
     if (!licenseFrontFile)
-      return alert("Bitte laden Sie die Vorderseite Ihres Führerscheins hoch.");
+      return showToast("Bitte laden Sie die Vorderseite Ihres Führerscheins hoch.");
     if (!licenseBackFile)
-      return alert("Bitte laden Sie die Rückseite Ihres Führerscheins hoch.");
-    if (!firstName || !lastName || !email || !phone || !residentCountry || !terms)
-      return alert("Bitte füllen Sie alle Pflichtfelder aus und akzeptieren Sie die AGB.");
+      return showToast("Bitte laden Sie die Rückseite Ihres Führerscheins hoch.");
+    if (!IDFrontFile)
+      return showToast("Bitte laden Sie die Vorderseite Ihres Ausweises hoch.");
+    if (!IDBackFile)
+      return showToast("Bitte laden Sie die Rückseite Ihres Ausweises hoch.");
+    if (!firstName || !lastName || !email || !mobile || !residentCountry || !terms)
+      return showToast("Bitte füllen Sie alle Pflichtfelder aus und akzeptieren Sie die AGB.");
     if (kmActive && km <= 0)
-      return alert("Bitte geben Sie die Anzahl der zusätzlichen Kilometer an.");
+      return showToast("Bitte geben Sie die Anzahl der zusätzlichen Kilometer an.");
     if (hourActive && hour <= 0)
-      return alert("Bitte geben Sie die Anzahl der zusätzlichen Stunden an.");
+      return showToast("Bitte geben Sie die Anzahl der zusätzlichen Stunden an.");
 
     // Upload files
     const licenseFrontPath = await uploadFile(licenseFrontFile, "license_front");
     const licenseBackPath  = await uploadFile(licenseBackFile, "license_back");
-    if (!licenseFrontPath || !licenseBackPath)
-      return alert("Fehler beim Hochladen der Dateien.");
+    const idFrontPath      = await uploadFile(IDFrontFile, "id_front");
+    const idBackPath       = await uploadFile(IDBackFile, "id_back");
+    if (!licenseFrontPath || !licenseBackPath || !idFrontPath || !idBackPath)
+      return showToast("Fehler beim Hochladen der Dateien.");
 
     try {
       // ── Create customer + reservation ────────────────────────────────────
@@ -291,16 +465,16 @@ const Form = () => {
               first_name:         firstName,
               last_name:          lastName,
               email:              email,
-              phone:              phone,
               mobile:             mobile,
               birthdate:          birthdate,
               license_no:         licenseNo,
               license_front_path: licenseFrontPath,
               license_back_path:  licenseBackPath,
+              id_front_path:      idFrontPath,
+              id_back_path:       idBackPath,
               address:            strasse,
               zip:                zip,
               resident_country:   residentCountry,
-              id_passport:        ID,
             },
             reservation: {
               car_id:                Number(id),
@@ -332,20 +506,22 @@ const Form = () => {
 
       const newReservationId = createData.reservationId;
 
+      showToast("Reservierung erfolgreich gespeichert!", "success");
+
       // ── Reset form ───────────────────────────────────────────────────────
       setCustomerType("private");
       setFirmaName("");
       setFirstName("");
       setLastName("");
       setEmail("");
-      setPhone("");
       setBirthdate("");
       setLicenseNo("");
       setLicenseFrontFile(null);
       setLicenseBackFile(null);
+      setIDFrontFile(null);
+      setIDBackFile(null);
       setStrasse("");
       setZip("");
-      setID("");
       setMobile("");
       setResidentCountry("");
       setStartDate(null);
@@ -368,7 +544,7 @@ const Form = () => {
 
     } catch (err) {
       console.error(err);
-      alert("Fehler beim Speichern der Reservierung: " + err.message);
+      showToast("Fehler beim Speichern der Reservierung: " + err.message);
     }
   };
 
@@ -398,6 +574,8 @@ const Form = () => {
   return (
     <PageLoader>
     <section>
+      <FlatpickrStyleFixes />
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
       <Nav />
       <div className="flex flex-col-reverse pt-15 m-5 md:m-10 gap-5 justify-center md:flex-row">
         <form
@@ -436,7 +614,7 @@ const Form = () => {
                 placeholder="Firma"
                 value={firmaName}
                 onChange={(e) => setFirmaName(e.target.value)}
-                className="border-2 p-2 bg-white border-yellow-900/5 rounded-lg"
+                className="border-2 p-2 bg-white border-yellow-900/5 rounded-lg outline-none focus:border-yellow-700 focus:ring-2 focus:ring-yellow-700/30"
               />
             </div>
           )}
@@ -451,7 +629,7 @@ const Form = () => {
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
                 required
-                className="border-2 p-2 bg-white border-yellow-900/5 rounded-lg"
+                className="border-2 p-2 bg-white border-yellow-900/5 rounded-lg outline-none focus:border-yellow-700 focus:ring-2 focus:ring-yellow-700/30"
               />
             </div>
             <div className="flex flex-col gap-1">
@@ -462,7 +640,7 @@ const Form = () => {
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
                 required
-                className="border-2 p-2 bg-white border-yellow-900/5 rounded-lg"
+                className="border-2 p-2 bg-white border-yellow-900/5 rounded-lg outline-none focus:border-yellow-700 focus:ring-2 focus:ring-yellow-700/30"
               />
             </div>
           </div>
@@ -477,18 +655,18 @@ const Form = () => {
                 value={strasse}
                 onChange={(e) => setStrasse(e.target.value)}
                 required
-                className="border-2 p-2 bg-white border-yellow-900/5 rounded-lg"
+                className="border-2 p-2 bg-white border-yellow-900/5 rounded-lg outline-none focus:border-yellow-700 focus:ring-2 focus:ring-yellow-700/30"
               />
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-xl font-semibold text-yellow-900">PLZ/Ort*</label>
               <input
-                type="number"
+                type="text"
                 placeholder="PLZ/Ort"
                 value={zip}
                 onChange={(e) => setZip(e.target.value)}
                 required
-                className="border-2 p-2 bg-white border-yellow-900/5 rounded-lg"
+                className="border-2 p-2 bg-white border-yellow-900/5 rounded-lg outline-none focus:border-yellow-700 focus:ring-2 focus:ring-yellow-700/30"
               />
             </div>
           </div>
@@ -511,7 +689,7 @@ const Form = () => {
                 value={birthdate}
                 onChange={(d, s) => handleBirthdateChange(s)}
                 options={{ dateFormat: "Y-m-d", maxDate: "today" }}
-                className="p-2 bg-white rounded-lg"
+                className="p-2 bg-white rounded-lg outline-none focus:ring-2 focus:ring-yellow-700/30"
                 placeholder="Geburtsdatum auswählen"
               />
               {birthError && (
@@ -520,32 +698,7 @@ const Form = () => {
             </div>
           </div>
 
-          {/* ── ID/Pass Nr. + Mobile ── */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div className="flex flex-col gap-1">
-              <label className="text-xl font-semibold text-yellow-900">ID/Pass Nr.*</label>
-              <input
-                type="text"
-                placeholder="ID/Pass Nr."
-                value={ID}
-                onChange={(e) => setID(e.target.value)}
-                required
-                className="border-2 p-2 bg-white border-yellow-900/5 rounded-lg"
-              />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-xl font-semibold text-yellow-900">Mobile</label>
-              <input
-                type="tel"
-                placeholder="Mobile"
-                value={mobile}
-                onChange={(e) => setMobile(e.target.value)}
-                className="border-2 p-2 bg-white border-yellow-900/5 rounded-lg"
-              />
-            </div>
-          </div>
-
-          {/* ── E-Mail + Telefonnummer ── */}
+          {/* ──Email + Mobile ── */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="flex flex-col gap-1">
               <label className="text-xl font-semibold text-yellow-900">E-Mail Adresse*</label>
@@ -555,56 +708,50 @@ const Form = () => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="border-2 p-2 bg-white border-yellow-900/5 rounded-lg"
+                className="border-2 p-2 bg-white border-yellow-900/5 rounded-lg outline-none focus:border-yellow-700 focus:ring-2 focus:ring-yellow-700/30"
               />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xl font-semibold text-yellow-900">Telefonnummer*</label>
+              <label className="text-xl font-semibold text-yellow-900">Mobile*</label>
               <input
                 type="tel"
-                placeholder="Telefonnummer"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                placeholder="Mobile"
+                value={mobile}
+                onChange={(e) => setMobile(e.target.value)}
+                className="border-2 p-2 bg-white border-yellow-900/5 rounded-lg outline-none focus:border-yellow-700 focus:ring-2 focus:ring-yellow-700/30"
                 required
-                className="border-2 p-2 bg-white border-yellow-900/5 rounded-lg"
               />
             </div>
           </div>
 
-          {/* ── Reservation Dates ── */}
+          {/* ── Reservation Dates (Start / Finish box style) ── */}
           <div className="flex flex-col gap-3">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div className="flex flex-col gap-1">
-                <label className="text-xl text-yellow-900 font-semibold">Reservierungsdatum</label>
-                <Flatpickr
-                  value={startDate}
-                  onChange={(d, s) => {
-                    setStartDate(s);
-                    setEndDate(null);
-                    calculatePrice(s, null);
-                  }}
-                  options={{ dateFormat: "Y-m-d", minDate: "today", disable: reservedDates }}
-                  className="p-2 bg-white rounded-lg"
-                  placeholder="Startdatum auswählen"
-                />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-xl text-yellow-900 font-semibold">Rückgabedatum</label>
-                <Flatpickr
-                  value={endDate}
-                  onChange={(d, s) => {
-                    setEndDate(s);
-                    calculatePrice(startDate, s);
-                  }}
-                  options={{
-                    dateFormat: "Y-m-d",
-                    minDate: startDate || "today",
-                    disable: reservedDates,
-                  }}
-                  className="p-2 bg-white rounded-lg"
-                  placeholder="Rückgabedatum auswählen"
-                />
-              </div>
+              <DateField
+                label="Reservierungsdatum"
+                value={startDate}
+                onChange={(d, s) => {
+                  setStartDate(s);
+                  setEndDate(null);
+                  calculatePrice(s, null);
+                }}
+                options={{ dateFormat: "Y-m-d", minDate: "today", disable: reservedDates }}
+                placeholder="Startdatum auswählen"
+              />
+              <DateField
+                label="Rückgabedatum"
+                value={endDate}
+                onChange={(d, s) => {
+                  setEndDate(s);
+                  calculatePrice(startDate, s);
+                }}
+                options={{
+                  dateFormat: "Y-m-d",
+                  minDate: startDate || "today",
+                  disable: reservedDates,
+                }}
+                placeholder="Rückgabedatum auswählen"
+              />
             </div>
 
             {startDate && endDate && (
@@ -634,37 +781,37 @@ const Form = () => {
                 value={licenseNo}
                 onChange={(e) => setLicenseNo(e.target.value)}
                 placeholder="Führerausweis"
-                className="border-2 p-2 bg-white border-yellow-900/5 rounded-lg"
+                className="border-2 p-2 bg-white border-yellow-900/5 rounded-lg outline-none focus:border-yellow-700 focus:ring-2 focus:ring-yellow-700/30"
               />
             </div>
           </div>
 
-          {/* ── File Uploads: Führerschein Vorder-/Rückseite ── */}
+          {/* ── File Uploads: ID Vorder-/Rückseite (attachment-card style) ── */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div className="flex flex-col gap-1">
-              <label className="text-xl font-semibold text-yellow-900">
-                Führerschein Vorderseite*
-              </label>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) => setLicenseFrontFile(e.target.files[0])}
-                required
-                className="border cursor-pointer p-2 rounded-lg bg-yellow-900/90 text-white hover:bg-yellow-900"
-              />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-xl font-semibold text-yellow-900">
-                Führerschein Rückseite*
-              </label>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) => setLicenseBackFile(e.target.files[0])}
-                required
-                className="border cursor-pointer p-2 rounded-lg bg-yellow-900/90 text-white hover:bg-yellow-900"
-              />
-            </div>
+            <FileUploadField
+              label="ID Vorderseite*"
+              file={IDFrontFile}
+              onChange={setIDFrontFile}
+            />
+            <FileUploadField
+              label="ID Rückseite*"
+              file={IDBackFile}
+              onChange={setIDBackFile}
+            />
+          </div>
+
+          {/* ── File Uploads: Führerschein Vorder-/Rückseite (attachment-card style) ── */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <FileUploadField
+              label="Führerschein Vorderseite*"
+              file={licenseFrontFile}
+              onChange={setLicenseFrontFile}
+            />
+            <FileUploadField
+              label="Führerschein Rückseite*"
+              file={licenseBackFile}
+              onChange={setLicenseBackFile}
+            />
           </div>
 
           {/* ── Zusatzleistungen ── */}

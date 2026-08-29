@@ -6,6 +6,9 @@ import { supabase } from "../supabaseClient";
 import { PDFDocument, rgb } from "pdf-lib";
 import Nav from "../components/Nav";
 import Footer from "../components/Footer.jsx";
+import { FaFileContract } from "react-icons/fa";
+import { AiFillSignature } from "react-icons/ai";
+import { BiErrorAlt } from "react-icons/bi";
 
 const WHATSAPP_NUMBER = "41784711672"; // +41 78 471 16 72
 
@@ -284,10 +287,10 @@ export default function SignContract() {
 
   // ── Main ──────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen flex flex-col bg-yellow-400/5">
+    <div className="min-h-screen flex flex-col bg-yellow-900/10">
       <Nav />
 
-      <div className="flex flex-col gap-5 m-5 md:m-10 max-w-3xl mx-auto w-full pt-15">
+      <div className="flex flex-col gap-5 m-5 md:m-10 max-w-3xl mx-auto w-full pt-15 p-5">
 
         {/* ── Booking Summary ── */}
         <div className="border-2 rounded-lg bg-yellow-400/5 border-yellow-900/5 p-5">
@@ -316,24 +319,27 @@ export default function SignContract() {
 
         {/* ── PDF Viewer ── */}
         <div className="border-2 rounded-lg bg-yellow-400/5 border-yellow-900/5 p-5 flex flex-col gap-3">
-          <h2 className="text-xl font-semibold text-yellow-900">
-            📄 Ihr Mietvertrag
+          <h2 className="text-xl font-semibold text-yellow-900 flex flex-row items-center">
+            <FaFileContract/>
+            <span className="block p-2">Ihr Mietvertrag</span>
           </h2>
           <iframe
             src={pdfUrl}
             className="w-full h-[500px] rounded-lg border-2 border-yellow-900/10"
             title="Mietvertrag"
           />
-          <div className="bg-amber-900/10 p-3 rounded-lg text-yellow-900 text-sm font-semibold">
-            ⚠️ Bitte scrollen Sie durch den gesamten Vertrag bevor Sie unterschreiben.
+          <div className="bg-amber-900/10 p-3 rounded-lg text-yellow-900 text-sm font-semibold flex flex-row items-center ">
+            <BiErrorAlt className="text-lg" />
+            <span className="block p-2">Bitte scrollen Sie durch den gesamten Vertrag bevor Sie unterschreiben.</span>
           </div>
         </div>
 
         {/* ── Signature or Success ── */}
         {!signed ? (
           <div className="border-2 rounded-lg bg-yellow-400/5 border-yellow-900/5 p-5 flex flex-col gap-4">
-            <h2 className="text-xl font-semibold text-yellow-900">
-              ✍️ Ihre Unterschrift
+            <h2 className="text-xl font-semibold text-yellow-900 flex flex-row items-center">
+              <AiFillSignature />
+              <span className="block p-2">Ihre Unterschrift</span>
             </h2>
 
             {/* Canvas */}

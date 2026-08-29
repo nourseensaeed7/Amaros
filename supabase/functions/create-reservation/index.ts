@@ -37,9 +37,11 @@ serve(async (req) => {
 
     // ── Basic server-side validation ─────────────────────────────────────
     const requiredCustomerFields = [
-      "first_name", "last_name", "email", "phone",
+      "first_name", "last_name", "email", "mobile",
       "resident_country", "license_no",
-      "license_front_path", "license_back_path", "address", "zip", "id_passport",
+      "license_front_path", "license_back_path",
+      "id_front_path", "id_back_path",
+      "address", "zip",
     ];
     for (const field of requiredCustomerFields) {
       if (!customer[field]) {
