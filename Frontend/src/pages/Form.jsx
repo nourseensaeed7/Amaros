@@ -7,41 +7,7 @@ import { useVehicles } from "../hooks/useVehicles.js";
 import Nav from "../components/Nav";
 import Footer from "../components/Footer.jsx";
 import PageLoader from "../components/PageLoader";
-// ─── Country Lists ────────────────────────────────────────────────────────────
-
-const COUNTRIES = [
-  "Afghanistan", "Albania", "Algeria", "Andorra", "Angola", "Antigua and Barbuda",
-  "Argentina", "Armenia", "Australia", "Austria", "Azerbaijan", "Bahamas", "Bahrain",
-  "Bangladesh", "Barbados", "Belarus", "Belgium", "Belize", "Benin", "Bhutan",
-  "Bolivia", "Bosnia and Herzegovina", "Botswana", "Brazil", "Brunei", "Bulgaria",
-  "Burkina Faso", "Burundi", "Cabo Verde", "Cambodia", "Cameroon", "Canada",
-  "Central African Republic", "Chad", "Chile", "China", "Colombia", "Comoros",
-  "Congo (Congo-Brazzaville)", "Costa Rica", "Croatia", "Cuba", "Cyprus",
-  "Czechia", "Denmark", "Djibouti", "Dominica", "Dominican Republic", "Ecuador",
-  "Egypt", "El Salvador", "Equatorial Guinea", "Eritrea", "Estonia", "Eswatini",
-  "Ethiopia", "Fiji", "Finland", "France", "Gabon", "Gambia", "Georgia", "Germany",
-  "Ghana", "Greece", "Grenada", "Guatemala", "Guinea", "Guinea-Bissau", "Guyana",
-  "Haiti", "Honduras", "Hungary", "Iceland", "India", "Indonesia", "Iran", "Iraq",
-  "Ireland", "Israel", "Italy", "Jamaica", "Japan", "Jordan", "Kazakhstan", "Kenya",
-  "Kiribati", "Kuwait", "Kyrgyzstan", "Laos", "Latvia", "Lebanon", "Lesotho",
-  "Liberia", "Libya", "Liechtenstein", "Lithuania", "Luxembourg", "Madagascar",
-  "Malawi", "Malaysia", "Maldives", "Mali", "Malta", "Marshall Islands",
-  "Mauritania", "Mauritius", "Mexico", "Micronesia", "Moldova", "Monaco",
-  "Mongolia", "Montenegro", "Morocco", "Mozambique", "Myanmar", "Namibia", "Nauru",
-  "Nepal", "Netherlands", "New Zealand", "Nicaragua", "Niger", "Nigeria",
-  "North Korea", "North Macedonia", "Norway", "Oman", "Pakistan", "Palau",
-  "Palestine State", "Panama", "Papua New Guinea", "Paraguay", "Peru", "Philippines",
-  "Poland", "Portugal", "Qatar", "Romania", "Russia", "Rwanda",
-  "Saint Kitts and Nevis", "Saint Lucia", "Saint Vincent and the Grenadines",
-  "Samoa", "San Marino", "Sao Tome and Principe", "Saudi Arabia", "Senegal",
-  "Serbia", "Seychelles", "Sierra Leone", "Singapore", "Slovakia", "Slovenia",
-  "Solomon Islands", "Somalia", "South Africa", "South Korea", "South Sudan",
-  "Spain", "Sri Lanka", "Sudan", "Suriname", "Sweden", "Switzerland", "Syria",
-  "Tajikistan", "Tanzania", "Thailand", "Timor-Leste", "Togo", "Tonga",
-  "Trinidad and Tobago", "Tunisia", "Turkey", "Turkmenistan", "Tuvalu", "Uganda",
-  "Ukraine", "United Arab Emirates", "United Kingdom", "United States", "Uruguay",
-  "Uzbekistan", "Vanuatu", "Venezuela", "Vietnam", "Yemen", "Zambia", "Zimbabwe",
-];
+// ─── Country List (Wohnsitzland only) ─────────────────────────────────────────
 
 const EUROPE_COUNTRIES = [
   "Albania", "Andorra", "Austria", "Belarus", "Belgium", "Bosnia and Herzegovina",
@@ -57,7 +23,7 @@ const EUROPE_COUNTRIES = [
 function CountryDropdown({
   value,
   onChange,
-  countries = COUNTRIES,
+  countries = EUROPE_COUNTRIES,
   placeholder = "Land auswählen",
   searchPlaceholder = "Suchen...",
   noResultsText = "Keine Ergebnisse",
@@ -177,19 +143,15 @@ const Form = () => {
   const [strasse, setStrasse] = useState("");
   const [zip, setZip] = useState("");
   const [ID, setID] = useState("");
-  const [nationallity, setNationallity] = useState("");   
   const [residentCountry, setResidentCountry] = useState("");
   const [email, setEmail] = useState("");
   const [birthdate, setBirthdate] = useState("");
   const [birthError, setBirthError] = useState("");
   const [phone, setPhone] = useState("");
   const [mobile,setMobile]=useState("")
-  const [city, setCity]=useState("")
   const [licenseNo, setLicenseNo] = useState("");
-  const [licenseIssuedate, setLicenseIssuedate] = useState("");
-  const [licenseCategory, setLicenseCategory] = useState("");
-  const [passportFile, setPassportFile] = useState(null);
-  const [licenseFile, setLicenseFile] = useState(null);
+  const [licenseFrontFile, setLicenseFrontFile] = useState(null);
+  const [licenseBackFile, setLicenseBackFile] = useState(null);
   const [reservedDates, setReservedDates] = useState([]);
   const [startDate, setStartDate] = useState(null);
   const [endDate, setEndDate] = useState(null);
@@ -276,14 +238,16 @@ const Form = () => {
   };
 
   // ── File upload ──
+  // NOTE: the "files" bucket is private, so we no longer call getPublicUrl().
+  // We store the object path and generate short-lived signed URLs server-side
+  // whenever the document actually needs to be viewed.
   const uploadFile = async (file, folder) => {
     if (!file) return null;
     const fileExt = file.name.split(".").pop();
     const filePath = `${folder}/${folder}_${Date.now()}.${fileExt}`;
     const { error } = await supabase.storage.from("files").upload(filePath, file);
     if (error) { console.error(error); return null; }
-    const { data } = supabase.storage.from("files").getPublicUrl(filePath);
-    return data.publicUrl;
+    return filePath;
   };
 
 // ── Submit ──
@@ -295,79 +259,78 @@ const Form = () => {
       return alert("Der Fahrer muss mindestens 25 Jahre alt sein.");
     if (!startDate || !endDate)
       return alert("Bitte wählen Sie Start- und Rückgabedatum.");
-    if (!passportFile)
-      return alert("Bitte laden Sie einen gültigen Pass oder Ausweis hoch.");
-    if (!licenseFile)
-      return alert("Bitte laden Sie einen Führerschein hoch.");
-    if (!firstName || !lastName || !email || !phone || !nationallity || !residentCountry || !terms)
+    if (!licenseFrontFile)
+      return alert("Bitte laden Sie die Vorderseite Ihres Führerscheins hoch.");
+    if (!licenseBackFile)
+      return alert("Bitte laden Sie die Rückseite Ihres Führerscheins hoch.");
+    if (!firstName || !lastName || !email || !phone || !residentCountry || !terms)
       return alert("Bitte füllen Sie alle Pflichtfelder aus und akzeptieren Sie die AGB.");
+    if (kmActive && km <= 0)
+      return alert("Bitte geben Sie die Anzahl der zusätzlichen Kilometer an.");
+    if (hourActive && hour <= 0)
+      return alert("Bitte geben Sie die Anzahl der zusätzlichen Stunden an.");
 
     // Upload files
-    const passportUrl = await uploadFile(passportFile, "passport");
-    const licenseUrl  = await uploadFile(licenseFile, "license");
-    if (!passportUrl || !licenseUrl)
+    const licenseFrontPath = await uploadFile(licenseFrontFile, "license_front");
+    const licenseBackPath  = await uploadFile(licenseBackFile, "license_back");
+    if (!licenseFrontPath || !licenseBackPath)
       return alert("Fehler beim Hochladen der Dateien.");
 
     try {
-      // ── Insert customer ──────────────────────────────────────────────────
-      const { data: customer, error: customerError } = await supabase
-        .from("customers")
-        .insert([
-          {
-            customer_type:      customerType,
-            firma_name:         customerType === "firma" ? firmaName : null,
-            first_name:         firstName,
-            last_name:          lastName,
-            email:              email,
-            phone:              phone,
-            mobile:             mobile,
-            birthdate:          birthdate,
-            license_no:         licenseNo,
-            license_issue_date: licenseIssuedate,
-            license_category:   licenseCategory,
-            passport_url:       passportUrl,
-            license_url:        licenseUrl,
-            address:            strasse,
-            zip:                zip,
-            nationality:        nationallity,
-            resident_country:   residentCountry,
-            id_passport:        ID,
+      // ── Create customer + reservation ────────────────────────────────────
+      // Runs server-side via the create-reservation edge function (service
+      // role key), since anon has no SELECT access on these tables and a
+      // direct .insert().select() from the browser can't read the row back.
+      const { data: createData, error: createError } = await supabase.functions.invoke(
+        "create-reservation",
+        {
+          body: {
+            customer: {
+              customer_type:      customerType,
+              firma_name:         customerType === "firma" ? firmaName : null,
+              first_name:         firstName,
+              last_name:          lastName,
+              email:              email,
+              phone:              phone,
+              mobile:             mobile,
+              birthdate:          birthdate,
+              license_no:         licenseNo,
+              license_front_path: licenseFrontPath,
+              license_back_path:  licenseBackPath,
+              address:            strasse,
+              zip:                zip,
+              resident_country:   residentCountry,
+              id_passport:        ID,
+            },
+            reservation: {
+              car_id:                Number(id),
+              reservation_date:      startDate,
+              start_date:            startDate,
+              end_date:              endDate,
+              haftpflicht_reduktion: redu,
+              vollkasko_reduktion:   insuRedu,
+              extra_km:              kmActive ? km : 0,
+              extra_km_price:        kmActive ? totalKmPrice : 0,
+              extra_hours:           hourActive ? hour : 0,
+              extra_hours_price:     hourActive ? totalHoursPrice : 0,
+              extra_total:           extraTotal,
+              total_price:           total,
+              km_active:             kmActive,
+              hour_active:           hourActive,
+              contract_status:       "pending",
+              contract_path:         null,
+              signed_contract_path:  null,
+              signed_at:             null,
+            },
           },
-        ])
-        .select()
-        .single();
+        }
+      );
 
-      if (customerError) throw new Error(customerError.message);
+      if (createError || createData?.error) {
+        throw new Error(createData?.error || "Fehler beim Speichern der Reservierung.");
+      }
 
-const { data: reservation, error: reservationError } = await supabase
-  .from("reservations")
-  .insert([
-    {
-      customer_id:           customer.id,
-      car_id:                Number(id),
-      reservation_date:      startDate,
-      start_date:            startDate,
-      end_date:              endDate,
-      haftpflicht_reduktion: redu,
-      vollkasko_reduktion:   insuRedu,
-      extra_km:              kmActive ? km : 0,
-      extra_km_price:        kmActive ? totalKmPrice : 0,
-      extra_hours:           hourActive ? hour : 0,
-      extra_hours_price:     hourActive ? totalHoursPrice : 0,
-      extra_total:           extraTotal,
-      total_price:           total,
-      km_active:             kmActive,
-      hour_active:           hourActive,
-      contract_status:       "pending",
-      contract_path:         null,
-      signed_contract_path:  null,
-      signed_at:             null,
-    },
-  ])
-  .select()   // ← must have this
-  .single();  // ← must have this
-
-if (reservationError) throw new Error(reservationError.message);
+      const newReservationId = createData.reservationId;
 
       // ── Reset form ───────────────────────────────────────────────────────
       setCustomerType("private");
@@ -378,14 +341,11 @@ if (reservationError) throw new Error(reservationError.message);
       setPhone("");
       setBirthdate("");
       setLicenseNo("");
-      setLicenseIssuedate("");
-      setLicenseCategory("");
-      setPassportFile(null);
-      setLicenseFile(null);
+      setLicenseFrontFile(null);
+      setLicenseBackFile(null);
       setStrasse("");
       setZip("");
       setID("");
-      setNationallity("");
       setMobile("");
       setResidentCountry("");
       setStartDate(null);
@@ -403,7 +363,7 @@ if (reservationError) throw new Error(reservationError.message);
       // ── Navigate to signing page ─────────────────────────────────────────
       // Pass the new reservation ID so SignContract can load the correct PDF
       navigate(`/Van-Form/${id}/sign-contract`, {
-        state: { reservationId: reservation.id },
+        state: { reservationId: newReservationId },
       });
 
     } catch (err) {
@@ -532,18 +492,9 @@ if (reservationError) throw new Error(reservationError.message);
               />
             </div>
           </div>
-          {/* ── Wohnsitzland (Europe) + E-Mail ── NEW */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div className="flex flex-col gap-1">
-              <label className="text-xl font-semibold text-yellow-900">Stadt*</label>
-              <input
-                value={city}
-                onChange={(e)=>setCity(e.target.value)}
-                placeholder="Stadt"
-                className="border-2 p-2 bg-white border-yellow-900/5 rounded-lg"
 
-              />
-            </div>
+          {/* ── Wohnsitzland + Geburtsdatum ── */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="flex flex-col gap-1">
               <label className="text-xl font-semibold text-yellow-900">Wohnsitzland*</label>
               <CountryDropdown
@@ -554,8 +505,6 @@ if (reservationError) throw new Error(reservationError.message);
                 noResultsText="Kein europäisches Land gefunden"
               />
             </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="flex flex-col gap-1">
               <label className="text-xl font-semibold text-yellow-900">Geburtsdatum*</label>
               <Flatpickr
@@ -569,19 +518,9 @@ if (reservationError) throw new Error(reservationError.message);
                 <span className="text-red-600 text-sm mt-1">{birthError}</span>
               )}
             </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-xl font-semibold text-yellow-900">Mobile</label>
-              <input
-                type="tel"
-                placeholder="Mobile"
-                value={mobile}
-                onChange={(e) => setMobile(e.target.value)}
-                className="border-2 p-2 bg-white border-yellow-900/5 rounded-lg"
-              />
-            </div>
           </div>
 
-          {/* ── ID + Nationality ── */}
+          {/* ── ID/Pass Nr. + Mobile ── */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="flex flex-col gap-1">
               <label className="text-xl font-semibold text-yellow-900">ID/Pass Nr.*</label>
@@ -595,17 +534,18 @@ if (reservationError) throw new Error(reservationError.message);
               />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xl font-semibold text-yellow-900">Nationalität*</label>
-              {/* FIX: onChange={setNationallity} — CountryDropdown passes string, not event */}
-              <CountryDropdown
-                value={nationallity}
-                onChange={setNationallity}
-                placeholder="Nationalität"
+              <label className="text-xl font-semibold text-yellow-900">Mobile</label>
+              <input
+                type="tel"
+                placeholder="Mobile"
+                value={mobile}
+                onChange={(e) => setMobile(e.target.value)}
+                className="border-2 p-2 bg-white border-yellow-900/5 rounded-lg"
               />
             </div>
           </div>
 
-          {/* ── Birthdate + Phone ── CHANGED: Phone moved here from standalone row */}
+          {/* ── E-Mail + Telefonnummer ── */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="flex flex-col gap-1">
               <label className="text-xl font-semibold text-yellow-900">E-Mail Adresse*</label>
@@ -685,8 +625,8 @@ if (reservationError) throw new Error(reservationError.message);
             {error && <span className="text-red-600 text-sm">{error}</span>}
           </div>
 
-          {/* ── License ── CHANGED: Führerausweis paired with Ausstellungsort */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {/* ── Führerausweis ── */}
+          <div className="grid grid-cols-1 gap-3">
             <div className="flex flex-col gap-1">
               <label className="text-xl font-semibold text-yellow-900">Führerausweis*</label>
               <input
@@ -697,65 +637,30 @@ if (reservationError) throw new Error(reservationError.message);
                 className="border-2 p-2 bg-white border-yellow-900/5 rounded-lg"
               />
             </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-xl font-semibold text-yellow-900">Ausstellungsort*</label>
-              <Flatpickr
-                value={licenseIssuedate}
-                onChange={(d, s) => setLicenseIssuedate(s)}
-                options={{ dateFormat: "Y-m-d", maxDate: "today" }}
-                className="p-2 bg-white rounded-lg"
-                placeholder="Ausstellungsort"
-              />
-            </div>
           </div>
 
-          {/* ── License Category ── */}
-          <div className="grid grid-cols-1  gap-3">
-            <div className="flex flex-col gap-1">
-              <label htmlFor="category" className="text-xl font-semibold text-yellow-900">
-                Kategorie*
-              </label>
-              <select
-                id="category"
-                value={licenseCategory}
-                onChange={(e) => setLicenseCategory(e.target.value)}
-                className="p-2 bg-white text-gray-500 cursor-pointer rounded-lg"
-              >
-                <option value="" disabled>Kategorie auswählen</option>
-                <option value="B">B</option>
-                <option value="BE">BE</option>
-                <option value="C">C</option>
-                <option value="C1">C1</option>
-                <option value="CE">CE</option>
-                <option value="C1E">C1E</option>
-                <option value="D1">D1</option>
-                <option value="D1E">D1E</option>
-              </select>
-            </div>
-          </div>
-
-          {/* ── File Uploads ── */}
+          {/* ── File Uploads: Führerschein Vorder-/Rückseite ── */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="flex flex-col gap-1">
               <label className="text-xl font-semibold text-yellow-900">
-                Gültiger Pass / ID hochladen*
+                Führerschein Vorderseite*
               </label>
               <input
                 type="file"
                 accept="image/*"
-                onChange={(e) => setPassportFile(e.target.files[0])}
+                onChange={(e) => setLicenseFrontFile(e.target.files[0])}
                 required
                 className="border cursor-pointer p-2 rounded-lg bg-yellow-900/90 text-white hover:bg-yellow-900"
               />
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-xl font-semibold text-yellow-900">
-                Führerschein hochladen*
+                Führerschein Rückseite*
               </label>
               <input
                 type="file"
                 accept="image/*"
-                onChange={(e) => setLicenseFile(e.target.files[0])}
+                onChange={(e) => setLicenseBackFile(e.target.files[0])}
                 required
                 className="border cursor-pointer p-2 rounded-lg bg-yellow-900/90 text-white hover:bg-yellow-900"
               />
@@ -804,10 +709,15 @@ if (reservationError) throw new Error(reservationError.message);
                   <label>Anzahl Kilometer:</label>
                   <input
                     type="number"
-                    value={km}
+                    value={km === 0 ? "" : km}
                     min={1}
+                    placeholder="0"
                     className="bg-white rounded-lg w-10 text-center"
-                    onChange={(e) => setKm(Number(e.target.value || 0))}
+                    onFocus={(e) => e.target.select()}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setKm(val === "" ? 0 : Number(val));
+                    }}
                   />
                   <span>+ CHF {totalKmPrice.toFixed(2)}</span>
                 </div>
@@ -828,10 +738,15 @@ if (reservationError) throw new Error(reservationError.message);
                   <label>Anzahl Stunden:</label>
                   <input
                     type="number"
-                    value={hour}
+                    value={hour === 0 ? "" : hour}
                     min={1}
+                    placeholder="0"
                     className="bg-white rounded-lg w-10 text-center"
-                    onChange={(e) => setHour(Number(e.target.value || 0))}
+                    onFocus={(e) => e.target.select()}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setHour(val === "" ? 0 : Number(val));
+                    }}
                   />
                   <span>+ CHF {totalHoursPrice.toFixed(2)}</span>
                 </div>
