@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Flatpickr from "react-flatpickr";
-import "flatpickr/dist/themes/light.css";   // or: airbnb.css, dark.css, confetti.css, material_green.css...
+import "flatpickr/dist/themes/light.css";
 import { IoImageOutline } from "react-icons/io5";
 import { LuCalendarDays } from "react-icons/lu";
 import { supabase } from "../supabaseClient";
@@ -53,9 +53,44 @@ const EUROPE_COUNTRIES = [
 //   stay fully visible/dark.
 // - Restyles the default black focus ring on the date input to match the
 //   site's yellow-900 theme.
+// - IMPORTANT: force-styles `.flatpickr-input` itself (background, border,
+//   padding, placeholder color) with !important. This is the fix for the
+//   mobile bug from the screenshot — flatpickr adds the `flatpickr-input`
+//   class to your real <input>, so whatever theme .css you import
+//   (material_blue, light, dark, whichever you switch to later) can end up
+//   overriding your Tailwind classes and swallowing the placeholder/border.
+//   These rules win regardless of theme, so that can't happen again.
+// - Also defines the `fadeIn` keyframe used by the toast animation, so it
+//   works even if tailwind.config.js doesn't have it registered.
 function FlatpickrStyleFixes() {
   return (
     <style>{`
+      @keyframes fadeIn {
+        0%   { opacity: 0; transform: translateY(-4px); }
+        100% { opacity: 1; transform: translateY(0); }
+      }
+
+      .flatpickr-input {
+        background: #fff !important;
+        border: 2px solid rgba(120, 53, 15, 0.1) !important;
+        border-radius: 0.5rem !important;
+        padding: 0.5rem 2.75rem 0.5rem 0.5rem !important;
+        color: #1c1917 !important;
+        box-shadow: none !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+      }
+      .flatpickr-input::placeholder {
+        color: rgba(120, 53, 15, 0.4) !important;
+        opacity: 1 !important;
+      }
+      .flatpickr-input:focus,
+      .flatpickr-input:focus-visible {
+        outline: none !important;
+        box-shadow: 0 0 0 2px rgba(120, 53, 15, 0.3) !important;
+        border-color: #78350f !important;
+      }
+
       .flatpickr-day.prevMonthDay,
       .flatpickr-day.nextMonthDay {
         visibility: hidden;
@@ -76,12 +111,6 @@ function FlatpickrStyleFixes() {
       .flatpickr-day.selected:hover {
         background: #78350f;
         border-color: #78350f;
-      }
-      .flatpickr-input:focus,
-      .flatpickr-input:focus-visible {
-        outline: none !important;
-        box-shadow: 0 0 0 2px rgba(120, 53, 15, 0.3) !important;
-        border-color: #78350f !important;
       }
     `}</style>
   );
@@ -202,7 +231,7 @@ function CountryDropdown({
 // (display:none), and browsers cannot show their native validation prompt on
 // a hidden element — that can silently block form submission with no visible
 // error at all. Presence is instead enforced explicitly in handleSubmit,
-// where a clear German alert tells the user exactly what's missing.
+// where a clear German toast tells the user exactly what's missing.
 function formatFileSize(bytes) {
   if (bytes < 1024) return `${bytes}b`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)}kb`;
@@ -261,21 +290,22 @@ function FileUploadField({ label, file, onChange, accept = "image/*" }) {
 // Mirrors the reference design's "Start" / "Finish" boxes: a small uppercase
 // label, the date value, and a calendar icon on the right — same white box /
 // yellow-900 border theme, still backed by Flatpickr for the actual picking.
+// `min-w-0` on the wrapper + `box-border` on the input stop the field from
+// ever overflowing its grid column on narrow/mobile screens.
 function DateField({ label, value, onChange, options, placeholder }) {
   return (
-    <div className="flex flex-col gap-1">
+    <div className="flex flex-col gap-1 min-w-0">
       <label className="text-xl text-yellow-900 font-semibold">{label}</label>
-      <div className="relative">
+      <div className="relative min-w-0">
         <Flatpickr
           value={value}
           onChange={onChange}
-          options={options}
+          options={{ ...options, placeholder }}
           placeholder={placeholder}
-          className="w-full p-2 pr-11 bg-white border-2 border-yellow-900/5 rounded-lg outline-none focus:border-yellow-700 focus:ring-2 focus:ring-yellow-700/30"
+          className="box-border w-full p-2 pr-11 bg-white border-2 border-yellow-900/5 rounded-lg outline-none focus:border-yellow-700 focus:ring-2 focus:ring-yellow-700/30"
         />
         <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 flex items-center justify-center w-7 h-7 rounded-md bg-yellow-900/10 text-yellow-900 text-sm">
           <LuCalendarDays />
-
         </span>
       </div>
     </div>
@@ -537,10 +567,15 @@ const Form = () => {
       loadReservedDates();
 
       // ── Navigate to signing page ─────────────────────────────────────────
-      // Pass the new reservation ID so SignContract can load the correct PDF
-      navigate(`/Van-Form/${id}/sign-contract`, {
-        state: { reservationId: newReservationId },
-      });
+      // Pass the new reservation ID so SignContract can load the correct PDF.
+      // Delayed slightly so the success toast above actually has time to be
+      // seen before the route change unmounts this page (immediate navigate
+      // was unmounting the toast before the user could read it).
+      setTimeout(() => {
+        navigate(`/Van-Form/${id}/sign-contract`, {
+          state: { reservationId: newReservationId },
+        });
+      }, 800);
 
     } catch (err) {
       console.error(err);
