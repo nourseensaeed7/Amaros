@@ -78,7 +78,10 @@ function FlatpickrStyleFixes() {
         color: #1c1917 !important;
         box-shadow: none !important;
         width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
         box-sizing: border-box !important;
+        display: block !important;
       }
       .flatpickr-input::placeholder {
         color: rgba(120, 53, 15, 0.4) !important;
@@ -271,7 +274,7 @@ function FileUploadField({ label, file, onChange, accept = "image/*" }) {
           </button>
         </div>
       ) : (
-        <label className="flex items-center justify-center gap-2 border-2 border-dashed border-yellow-900/20 rounded-lg p-2.5 text-sm text-yellow-900/60 cursor-pointer hover:border-yellow-900/40 hover:bg-yellow-50/50 transition-colors">
+        <label className="box-border flex w-full items-center justify-center gap-2 border-2 border-dashed border-yellow-900/20 rounded-lg p-2.5 text-sm text-yellow-900/60 cursor-pointer hover:border-yellow-900/40 hover:bg-yellow-50/50 transition-colors">
           <span className="text-base leading-none">+</span> Add File
           <input
             ref={inputRef}
@@ -724,7 +727,7 @@ const Form = () => {
                 value={birthdate}
                 onChange={(d, s) => handleBirthdateChange(s)}
                 options={{ dateFormat: "Y-m-d", maxDate: "today" }}
-                className="p-2 bg-white rounded-lg outline-none focus:ring-2 focus:ring-yellow-700/30"
+                className="box-border w-full p-2 bg-white border-2 border-yellow-900/5 rounded-lg outline-none focus:border-yellow-700 focus:ring-2 focus:ring-yellow-700/30"
                 placeholder="Geburtsdatum auswählen"
               />
               {birthError && (
