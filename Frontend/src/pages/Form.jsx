@@ -73,6 +73,7 @@ function FlatpickrStyleFixes() {
       .flatpickr-input {
         width: 100% !important;
         max-width: 100% !important;
+        min-width: 0 !important;
         box-sizing: border-box !important;
         background: #fff !important;
         border-radius: 0.5rem !important;
@@ -293,9 +294,9 @@ function FileUploadField({ label, file, onChange, accept = "image/*" }) {
 // natural size.
 function DateField({ label, value, onChange, options, placeholder }) {
   return (
-    <div className="flex flex-col gap-1 min-w-0">
+    <div className="flex flex-col gap-1 min-w-0 overflow-hidden">
       <label className="text-xl text-yellow-900 font-semibold">{label}</label>
-      <div className="relative min-w-0">
+      <div className="relative min-w-0 overflow-hidden rounded-lg">
         <Flatpickr
           value={value}
           onChange={onChange}
@@ -717,7 +718,7 @@ const Form = () => {
                 noResultsText="Kein europäisches Land gefunden"
               />
             </div>
-            <div className="flex flex-col gap-1 min-w-0">
+            <div className="flex flex-col gap-1 min-w-0 overflow-hidden">
               <label className="text-xl font-semibold text-yellow-900">Geburtsdatum*</label>
               <Flatpickr
                 value={birthdate}
