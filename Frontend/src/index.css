@@ -14,7 +14,3 @@ body {
   .indent {
    margin-left: 20px;
 }
-.flatpickr-day.nextMonthDay,
-.flatpickr-day.prevMonthDay {
-  visibility: hidden;
-}

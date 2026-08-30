@@ -72,28 +72,17 @@ function FlatpickrStyleFixes() {
 
       .flatpickr-input {
         background: #fff !important;
-        border: 2px solid rgba(120, 53, 15, 0.1) !important;
         border-radius: 0.5rem !important;
         padding: 0.5rem 2.75rem 0.5rem 0.5rem !important;
         color: #1c1917 !important;
         box-shadow: none !important;
-        width: 100% !important;
-        max-width: 100% !important;
-        min-width: 0 !important;
         box-sizing: border-box !important;
         display: block !important;
+        width: 100% !important;
       }
       .flatpickr-input::placeholder {
-        color: rgba(120, 53, 15, 0.4) !important;
         opacity: 1 !important;
       }
-      .flatpickr-input:focus,
-      .flatpickr-input:focus-visible {
-        outline: none !important;
-        box-shadow: 0 0 0 2px rgba(120, 53, 15, 0.3) !important;
-        border-color: #78350f !important;
-      }
-
       .flatpickr-day.prevMonthDay,
       .flatpickr-day.nextMonthDay {
         visibility: hidden;
@@ -297,15 +286,15 @@ function FileUploadField({ label, file, onChange, accept = "image/*" }) {
 // ever overflowing its grid column on narrow/mobile screens.
 function DateField({ label, value, onChange, options, placeholder }) {
   return (
-    <div className="flex flex-col gap-1 min-w-0">
+    <div className="flex flex-col gap-1">
       <label className="text-xl text-yellow-900 font-semibold">{label}</label>
-      <div className="relative min-w-0">
+      <div className="relative ">
         <Flatpickr
           value={value}
           onChange={onChange}
           options={{ ...options, placeholder }}
           placeholder={placeholder}
-          className="box-border w-full p-2 pr-11 bg-white border-2 border-yellow-900/5 rounded-lg outline-none focus:border-yellow-700 focus:ring-2 focus:ring-yellow-700/30"
+          className="border-2 p-2 bg-white border-yellow-900/5 rounded-lg outline-none focus:border-yellow-700 focus:ring-2 focus:ring-yellow-700/30"
         />
         <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 flex items-center justify-center w-7 h-7 rounded-md bg-yellow-900/10 text-yellow-900 text-sm">
           <LuCalendarDays />
@@ -727,7 +716,7 @@ const Form = () => {
                 value={birthdate}
                 onChange={(d, s) => handleBirthdateChange(s)}
                 options={{ dateFormat: "Y-m-d", maxDate: "today" }}
-                className="box-border w-full p-2 bg-white border-2 border-yellow-900/5 rounded-lg outline-none focus:border-yellow-700 focus:ring-2 focus:ring-yellow-700/30"
+                className="box-border  p-2 bg-white border-2 border-yellow-900/5 rounded-lg outline-none focus:border-yellow-700 focus:ring-2 focus:ring-yellow-700/30"
                 placeholder="Geburtsdatum auswählen"
               />
               {birthError && (
