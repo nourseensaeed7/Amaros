@@ -71,14 +71,15 @@ function FlatpickrStyleFixes() {
       }
 
       .flatpickr-input {
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
         background: #fff !important;
         border-radius: 0.5rem !important;
         padding: 0.5rem 2.75rem 0.5rem 0.5rem !important;
         color: #1c1917 !important;
         box-shadow: none !important;
-        box-sizing: border-box !important;
         display: block !important;
-        width: 100% !important;
       }
       .flatpickr-input::placeholder {
         opacity: 1 !important;
@@ -239,7 +240,7 @@ function FileUploadField({ label, file, onChange, accept = "image/*" }) {
   };
 
   return (
-    <div className="flex flex-col gap-1">
+    <div className="flex flex-col gap-1 min-w-0">
       <label className="text-xl font-semibold text-yellow-900">{label}</label>
 
       {file ? (
@@ -282,19 +283,25 @@ function FileUploadField({ label, file, onChange, accept = "image/*" }) {
 // Mirrors the reference design's "Start" / "Finish" boxes: a small uppercase
 // label, the date value, and a calendar icon on the right — same white box /
 // yellow-900 border theme, still backed by Flatpickr for the actual picking.
-// `min-w-0` on the wrapper + `box-border` on the input stop the field from
-// ever overflowing its grid column on narrow/mobile screens.
+//
+// `min-w-0` on both wrapper divs + `w-full box-border` on the input are the
+// actual fix for the mobile overflow bug: Flatpickr's rendered <input> has
+// its own intrinsic width via an internal `size` attribute, and grid items
+// default to `min-width: auto`, which together let the input push past its
+// column instead of shrinking to fit. Without `min-w-0` here, `w-full` alone
+// isn't enough — the grid track itself refuses to shrink below the input's
+// natural size.
 function DateField({ label, value, onChange, options, placeholder }) {
   return (
-    <div className="flex flex-col gap-1">
+    <div className="flex flex-col gap-1 min-w-0">
       <label className="text-xl text-yellow-900 font-semibold">{label}</label>
-      <div className="relative ">
+      <div className="relative min-w-0">
         <Flatpickr
           value={value}
           onChange={onChange}
           options={{ ...options, placeholder }}
           placeholder={placeholder}
-          className="border-2 p-2 bg-white border-yellow-900/5 rounded-lg outline-none focus:border-yellow-700 focus:ring-2 focus:ring-yellow-700/30"
+          className="w-full box-border p-2 pr-11 bg-white border-2 border-yellow-900/5 rounded-lg outline-none focus:border-yellow-700 focus:ring-2 focus:ring-yellow-700/30"
         />
         <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 flex items-center justify-center w-7 h-7 rounded-md bg-yellow-900/10 text-yellow-900 text-sm">
           <LuCalendarDays />
@@ -700,7 +707,7 @@ const Form = () => {
 
           {/* ── Wohnsitzland + Geburtsdatum ── */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-1 min-w-0">
               <label className="text-xl font-semibold text-yellow-900">Wohnsitzland*</label>
               <CountryDropdown
                 value={residentCountry}
@@ -710,13 +717,13 @@ const Form = () => {
                 noResultsText="Kein europäisches Land gefunden"
               />
             </div>
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-1 min-w-0">
               <label className="text-xl font-semibold text-yellow-900">Geburtsdatum*</label>
               <Flatpickr
                 value={birthdate}
                 onChange={(d, s) => handleBirthdateChange(s)}
                 options={{ dateFormat: "Y-m-d", maxDate: "today" }}
-                className="box-border  p-2 bg-white border-2 border-yellow-900/5 rounded-lg outline-none focus:border-yellow-700 focus:ring-2 focus:ring-yellow-700/30"
+                className="w-full box-border p-2 bg-white border-2 border-yellow-900/5 rounded-lg outline-none focus:border-yellow-700 focus:ring-2 focus:ring-yellow-700/30"
                 placeholder="Geburtsdatum auswählen"
               />
               {birthError && (
