@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Flatpickr from "react-flatpickr";
 import "flatpickr/dist/themes/light.css";
@@ -9,7 +9,13 @@ import { useVehicles } from "../hooks/useVehicles.js";
 import Nav from "../components/Nav";
 import Footer from "../components/Footer.jsx";
 import PageLoader from "../components/PageLoader";
-// ─── Country List (Wohnsitzland only) ─────────────────────────────────────────
+
+// ─── Shared styling tokens ────────────────────────────────────────────────────
+// One place for the field label + input look, so every field stays identical
+// and a theme tweak is a one-line change instead of a find-and-replace.
+const LABEL_CLASS = "text-xl font-semibold text-yellow-900";
+const INPUT_CLASS =
+  "border-2 p-2 bg-white border-yellow-900/5 rounded-lg outline-none focus:border-yellow-700 focus:ring-2 focus:ring-yellow-700/30";
 
 // ─── Toast Notifications ──────────────────────────────────────────────────────
 // A lightweight, themed replacement for the browser's native alert() popup.
@@ -54,12 +60,10 @@ const EUROPE_COUNTRIES = [
 // - Restyles the default black focus ring on the date input to match the
 //   site's yellow-900 theme.
 // - IMPORTANT: force-styles `.flatpickr-input` itself (background, border,
-//   padding, placeholder color) with !important. This is the fix for the
-//   mobile bug from the screenshot — flatpickr adds the `flatpickr-input`
-//   class to your real <input>, so whatever theme .css you import
-//   (material_blue, light, dark, whichever you switch to later) can end up
-//   overriding your Tailwind classes and swallowing the placeholder/border.
-//   These rules win regardless of theme, so that can't happen again.
+//   padding, placeholder color) with !important. flatpickr adds the
+//   `flatpickr-input` class to your real <input>, so whatever theme .css you
+//   import can otherwise override your Tailwind classes and swallow the
+//   placeholder/border. These rules win regardless of theme.
 // - Also defines the `fadeIn` keyframe used by the toast animation, so it
 //   works even if tailwind.config.js doesn't have it registered.
 function FlatpickrStyleFixes() {
@@ -83,6 +87,7 @@ function FlatpickrStyleFixes() {
         display: block !important;
       }
       .flatpickr-input::placeholder {
+        color: #9ca3af !important;
         opacity: 1 !important;
       }
       .flatpickr-day.prevMonthDay,
@@ -107,6 +112,67 @@ function FlatpickrStyleFixes() {
         border-color: #78350f;
       }
     `}</style>
+  );
+}
+
+// ─── Text Field ───────────────────────────────────────────────────────────────
+// The standard label + input pair used across the whole form. Pass `placeholder`
+// explicitly (labels carry a trailing "*", placeholders don't).
+function TextField({ label, value, onChange, placeholder, type = "text", required = false, name }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <label className={LABEL_CLASS}>{label}</label>
+      <input
+        type={type}
+        name={name}
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        required={required}
+        className={INPUT_CLASS}
+      />
+    </div>
+  );
+}
+
+// ─── Service Row (Zusatzleistungen checkbox line) ────────────────────────────
+// A checkbox + its label, plus any trailing controls (e.g. the km/hour amount
+// box) passed as children. `rowClass` keeps the exact per-row gap the design
+// used before.
+function ServiceRow({ checked, onChange, label, name, rowClass = "gap-12", children }) {
+  return (
+    <div className={`flex items-center ${rowClass} text-yellow-900 text-sm font-semibold`}>
+      <label>
+        <input
+          type="checkbox"
+          name={name}
+          className="mx-1"
+          checked={checked}
+          onChange={onChange}
+        />
+        {label}
+      </label>
+      {children}
+    </div>
+  );
+}
+
+// ─── Amount box (km / hours) ─────────────────────────────────────────────────
+function AmountInput({ label, value, onChange, suffix, wrapClass = "gap-2" }) {
+  return (
+    <div className={`flex items-center ${wrapClass}`}>
+      <label>{label}</label>
+      <input
+        type="number"
+        value={value === 0 ? "" : value}
+        min={1}
+        placeholder="0"
+        className="bg-white rounded-lg w-10 text-center"
+        onFocus={(e) => e.target.select()}
+        onChange={onChange}
+      />
+      <span>{suffix}</span>
+    </div>
   );
 }
 
@@ -215,17 +281,13 @@ function CountryDropdown({
 }
 
 // ─── File Upload Field (attachment-card style) ───────────────────────────────
-// Mirrors the "Attachments" pattern from the reference design: an "+ Add File"
-// dashed dropzone-style trigger, and once a file is chosen, a card with a file
-// icon, name, size, and a red "✕" to remove — same yellow-900 theme as the
-// rest of the form.
+// An "+ Add File" dashed dropzone trigger; once a file is chosen, a card with a
+// file icon, name, size, and a red "✕" to remove.
 //
 // NOTE: this field intentionally does NOT rely on the native HTML5 "required"
-// attribute. The underlying <input type="file"> is visually hidden
-// (display:none), and browsers cannot show their native validation prompt on
-// a hidden element — that can silently block form submission with no visible
-// error at all. Presence is instead enforced explicitly in handleSubmit,
-// where a clear German toast tells the user exactly what's missing.
+// attribute. The underlying <input type="file"> is visually hidden, and
+// browsers cannot show their native validation prompt on a hidden element.
+// Presence is enforced explicitly in handleSubmit via a clear German toast.
 function formatFileSize(bytes) {
   if (bytes < 1024) return `${bytes}b`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)}kb`;
@@ -242,7 +304,7 @@ function FileUploadField({ label, file, onChange, accept = "image/*" }) {
 
   return (
     <div className="flex flex-col gap-1 min-w-0">
-      <label className="text-xl font-semibold text-yellow-900">{label}</label>
+      <label className={LABEL_CLASS}>{label}</label>
 
       {file ? (
         <div className="flex items-center justify-between gap-2 border-2 border-yellow-900/5 bg-white rounded-lg p-2.5">
@@ -281,26 +343,27 @@ function FileUploadField({ label, file, onChange, accept = "image/*" }) {
 }
 
 // ─── Date Field (Start / Finish box style) ───────────────────────────────────
-// Mirrors the reference design's "Start" / "Finish" boxes: a small uppercase
-// label, the date value, and a calendar icon on the right — same white box /
-// yellow-900 border theme, still backed by Flatpickr for the actual picking.
+// A small label, the Flatpickr input, and a calendar icon on the right.
 //
-// `min-w-0` on both wrapper divs + `w-full box-border` on the input are the
-// actual fix for the mobile overflow bug: Flatpickr's rendered <input> has
-// its own intrinsic width via an internal `size` attribute, and grid items
-// default to `min-width: auto`, which together let the input push past its
-// column instead of shrinking to fit. Without `min-w-0` here, `w-full` alone
-// isn't enough — the grid track itself refuses to shrink below the input's
-// natural size.
+// `min-w-0` on both wrapper divs + `w-full box-border` on the input fix the
+// mobile overflow bug: Flatpickr's rendered <input> has its own intrinsic
+// width, and grid items default to `min-width: auto`, which together let the
+// input push past its column instead of shrinking to fit.
+//
+// IMPORTANT: `options` must be a STABLE reference (memoize it in the parent).
+// react-flatpickr re-applies options — and redraws the open calendar — every
+// time the `options` object identity changes. Building a fresh object here on
+// every render is what caused a click to land on "today" and close the picker,
+// so we pass the parent's memoized object straight through.
 function DateField({ label, value, onChange, options, placeholder }) {
   return (
     <div className="flex flex-col gap-1 min-w-0 overflow-hidden">
-      <label className="text-xl text-yellow-900 font-semibold">{label}</label>
+      <label className={LABEL_CLASS}>{label}</label>
       <div className="relative min-w-0 overflow-hidden rounded-lg">
         <Flatpickr
           value={value}
           onChange={onChange}
-          options={{ ...options, placeholder }}
+          options={options}
           placeholder={placeholder}
           className="w-full box-border p-2 pr-11 bg-white border-2 border-yellow-900/5 rounded-lg outline-none focus:border-yellow-700 focus:ring-2 focus:ring-yellow-700/30"
         />
@@ -317,11 +380,13 @@ const Form = () => {
   const { vehicles, loading: vehiclesLoading, error: vehiclesError } = useVehicles();
   const vehicle = vehicles.find((v) => v.id === Number(id));
 
+  // Rates used ONLY for the live on-screen estimate. The authoritative price is
+  // (re)computed on the server by the create-reservation edge function.
   const kmPrice = 0.6;
   const hourPrice = 20.0;
   const reductionPrice = 12.0;
   const volkasko = 15.0;
-  const navigate=useNavigate();
+  const navigate = useNavigate();
 
   // ── Form state ──
   const [customerType, setCustomerType] = useState("private");
@@ -334,7 +399,7 @@ const Form = () => {
   const [email, setEmail] = useState("");
   const [birthdate, setBirthdate] = useState("");
   const [birthError, setBirthError] = useState("");
-  const [mobile,setMobile]=useState("")
+  const [mobile, setMobile] = useState("");
   const [licenseNo, setLicenseNo] = useState("");
   const [licenseFrontFile, setLicenseFrontFile] = useState(null);
   const [licenseBackFile, setLicenseBackFile] = useState(null);
@@ -350,10 +415,11 @@ const Form = () => {
   const [kmActive, setkmActive] = useState(false);
   const [hourActive, setHourActive] = useState(false);
   const [totalPrice, setTotalPrice] = useState(0);
-  const [error, setError] = useState("");
+  const [error] = useState("");
   const [terms, setTerms] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [toasts, setToasts] = useState([]);
+  const [submitting, setSubmitting] = useState(false);
 
   const showToast = (message, type = "error") => {
     const id = Date.now() + Math.random();
@@ -372,6 +438,24 @@ const Form = () => {
     (hourActive ? totalHoursPrice : 0) +
     (insuRedu ? volkasko : 0);
   const total = Number(extraTotal + totalPrice);
+
+  // ── Flatpickr options (memoized) ──
+  // Stable references so react-flatpickr doesn't redraw the open calendar on
+  // every render. `disableMobile: true` forces our themed calendar (which shows
+  // the placeholder) on phones instead of the native date input, which ignores
+  // the placeholder entirely.
+  const birthdateOptions = useMemo(
+    () => ({ dateFormat: "Y-m-d", maxDate: "today", disableMobile: true }),
+    []
+  );
+  const startDateOptions = useMemo(
+    () => ({ dateFormat: "Y-m-d", minDate: "today", disable: reservedDates, disableMobile: true }),
+    [reservedDates]
+  );
+  const endDateOptions = useMemo(
+    () => ({ dateFormat: "Y-m-d", minDate: startDate || "today", disable: reservedDates, disableMobile: true }),
+    [startDate, reservedDates]
+  );
 
   // ── Scroll lock when modal is open ──
   useEffect(() => {
@@ -392,7 +476,7 @@ const Form = () => {
     setShowModal(false);
   };
 
-  // ── Price calculation ──
+  // ── Price calculation (on-screen estimate only) ──
   const calculatePrice = (start, end) => {
     if (!start || !end || !vehicle) { setTotalPrice(0); return; }
     const diffDays =
@@ -436,9 +520,8 @@ const Form = () => {
   };
 
   // ── File upload ──
-  // NOTE: the "files" bucket is private, so we no longer call getPublicUrl().
-  // We store the object path and generate short-lived signed URLs server-side
-  // whenever the document actually needs to be viewed.
+  // The "files" bucket is private, so we store the object path and generate
+  // short-lived signed URLs server-side whenever the document needs viewing.
   const uploadFile = async (file, folder) => {
     if (!file) return null;
     const fileExt = file.name.split(".").pop();
@@ -448,9 +531,39 @@ const Form = () => {
     return filePath;
   };
 
-// ── Submit ──
+  // ── Reset form ──
+  const resetForm = () => {
+    setCustomerType("private");
+    setFirmaName("");
+    setFirstName("");
+    setLastName("");
+    setEmail("");
+    setBirthdate("");
+    setLicenseNo("");
+    setLicenseFrontFile(null);
+    setLicenseBackFile(null);
+    setIDFrontFile(null);
+    setIDBackFile(null);
+    setStrasse("");
+    setZip("");
+    setMobile("");
+    setResidentCountry("");
+    setStartDate(null);
+    setEndDate(null);
+    setRedu(false);
+    setInsuRedu(false);
+    setKm(0);
+    setHour(0);
+    setkmActive(false);
+    setHourActive(false);
+    setTerms(false);
+    setTotalPrice(0);
+  };
+
+  // ── Submit ──
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (submitting) return;
 
     // Validation
     if (!isAgeValid())
@@ -465,26 +578,28 @@ const Form = () => {
       return showToast("Bitte laden Sie die Vorderseite Ihres Ausweises hoch.");
     if (!IDBackFile)
       return showToast("Bitte laden Sie die Rückseite Ihres Ausweises hoch.");
-    if (!firstName || !lastName || !email || !mobile || !residentCountry || !terms)
+    if (!firstName || !lastName || !strasse || !zip || !email || !mobile ||
+        !residentCountry || !licenseNo || !terms)
       return showToast("Bitte füllen Sie alle Pflichtfelder aus und akzeptieren Sie die AGB.");
     if (kmActive && km <= 0)
       return showToast("Bitte geben Sie die Anzahl der zusätzlichen Kilometer an.");
     if (hourActive && hour <= 0)
       return showToast("Bitte geben Sie die Anzahl der zusätzlichen Stunden an.");
 
-    // Upload files
-    const licenseFrontPath = await uploadFile(licenseFrontFile, "license_front");
-    const licenseBackPath  = await uploadFile(licenseBackFile, "license_back");
-    const idFrontPath      = await uploadFile(IDFrontFile, "id_front");
-    const idBackPath       = await uploadFile(IDBackFile, "id_back");
-    if (!licenseFrontPath || !licenseBackPath || !idFrontPath || !idBackPath)
-      return showToast("Fehler beim Hochladen der Dateien.");
-
+    setSubmitting(true);
     try {
-      // ── Create customer + reservation ────────────────────────────────────
-      // Runs server-side via the create-reservation edge function (service
-      // role key), since anon has no SELECT access on these tables and a
-      // direct .insert().select() from the browser can't read the row back.
+      // Upload files
+      const licenseFrontPath = await uploadFile(licenseFrontFile, "license_front");
+      const licenseBackPath  = await uploadFile(licenseBackFile, "license_back");
+      const idFrontPath      = await uploadFile(IDFrontFile, "id_front");
+      const idBackPath       = await uploadFile(IDBackFile, "id_back");
+      if (!licenseFrontPath || !licenseBackPath || !idFrontPath || !idBackPath)
+        throw new Error("Fehler beim Hochladen der Dateien.");
+
+      // ── Create customer + reservation ──────────────────────────────────────
+      // Runs server-side via the create-reservation edge function. We send only
+      // the *inputs*; the server recomputes every price from the vehicle's own
+      // rate, so the totals can't be tampered with from the browser.
       const { data: createData, error: createError } = await supabase.functions.invoke(
         "create-reservation",
         {
@@ -513,18 +628,10 @@ const Form = () => {
               end_date:              endDate,
               haftpflicht_reduktion: redu,
               vollkasko_reduktion:   insuRedu,
-              extra_km:              kmActive ? km : 0,
-              extra_km_price:        kmActive ? totalKmPrice : 0,
-              extra_hours:           hourActive ? hour : 0,
-              extra_hours_price:     hourActive ? totalHoursPrice : 0,
-              extra_total:           extraTotal,
-              total_price:           total,
               km_active:             kmActive,
               hour_active:           hourActive,
-              contract_status:       "pending",
-              contract_path:         null,
-              signed_contract_path:  null,
-              signed_at:             null,
+              extra_km:              kmActive ? km : 0,
+              extra_hours:           hourActive ? hour : 0,
             },
           },
         }
@@ -537,40 +644,12 @@ const Form = () => {
       const newReservationId = createData.reservationId;
 
       showToast("Reservierung erfolgreich gespeichert!", "success");
-
-      // ── Reset form ───────────────────────────────────────────────────────
-      setCustomerType("private");
-      setFirmaName("");
-      setFirstName("");
-      setLastName("");
-      setEmail("");
-      setBirthdate("");
-      setLicenseNo("");
-      setLicenseFrontFile(null);
-      setLicenseBackFile(null);
-      setIDFrontFile(null);
-      setIDBackFile(null);
-      setStrasse("");
-      setZip("");
-      setMobile("");
-      setResidentCountry("");
-      setStartDate(null);
-      setEndDate(null);
-      setRedu(false);
-      setInsuRedu(false);
-      setKm(0);
-      setHour(0);
-      setkmActive(false);
-      setHourActive(false);
-      setTerms(false);
-      setTotalPrice(0);
+      resetForm();
       loadReservedDates();
 
       // ── Navigate to signing page ─────────────────────────────────────────
-      // Pass the new reservation ID so SignContract can load the correct PDF.
-      // Delayed slightly so the success toast above actually has time to be
-      // seen before the route change unmounts this page (immediate navigate
-      // was unmounting the toast before the user could read it).
+      // Delayed slightly so the success toast is seen before the route change
+      // unmounts this page.
       setTimeout(() => {
         navigate(`/Van-Form/${id}/sign-contract`, {
           state: { reservationId: newReservationId },
@@ -580,6 +659,8 @@ const Form = () => {
     } catch (err) {
       console.error(err);
       showToast("Fehler beim Speichern der Reservierung: " + err.message);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -642,74 +723,54 @@ const Form = () => {
 
           {/* ── Firma ── */}
           {customerType === "firma" && (
-            <div className="flex flex-col gap-1">
-              <label className="text-xl font-semibold text-yellow-900">Firma</label>
-              <input
-                type="text"
-                placeholder="Firma"
-                value={firmaName}
-                onChange={(e) => setFirmaName(e.target.value)}
-                className="border-2 p-2 bg-white border-yellow-900/5 rounded-lg outline-none focus:border-yellow-700 focus:ring-2 focus:ring-yellow-700/30"
-              />
-            </div>
+            <TextField
+              label="Firma"
+              placeholder="Firma"
+              value={firmaName}
+              onChange={(e) => setFirmaName(e.target.value)}
+            />
           )}
 
           {/* ── Name ── */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div className="flex flex-col gap-1">
-              <label className="text-xl font-semibold text-yellow-900">Vorname*</label>
-              <input
-                type="text"
-                placeholder="Vorname"
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-                required
-                className="border-2 p-2 bg-white border-yellow-900/5 rounded-lg outline-none focus:border-yellow-700 focus:ring-2 focus:ring-yellow-700/30"
-              />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-xl font-semibold text-yellow-900">Nachname*</label>
-              <input
-                type="text"
-                placeholder="Nachname"
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-                required
-                className="border-2 p-2 bg-white border-yellow-900/5 rounded-lg outline-none focus:border-yellow-700 focus:ring-2 focus:ring-yellow-700/30"
-              />
-            </div>
+            <TextField
+              label="Vorname*"
+              placeholder="Vorname"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              required
+            />
+            <TextField
+              label="Nachname*"
+              placeholder="Nachname"
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
+              required
+            />
           </div>
 
           {/* ── Address ── */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div className="flex flex-col gap-1">
-              <label className="text-xl font-semibold text-yellow-900">Strasse*</label>
-              <input
-                type="text"
-                placeholder="Strasse"
-                value={strasse}
-                onChange={(e) => setStrasse(e.target.value)}
-                required
-                className="border-2 p-2 bg-white border-yellow-900/5 rounded-lg outline-none focus:border-yellow-700 focus:ring-2 focus:ring-yellow-700/30"
-              />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-xl font-semibold text-yellow-900">PLZ/Ort*</label>
-              <input
-                type="text"
-                placeholder="PLZ/Ort"
-                value={zip}
-                onChange={(e) => setZip(e.target.value)}
-                required
-                className="border-2 p-2 bg-white border-yellow-900/5 rounded-lg outline-none focus:border-yellow-700 focus:ring-2 focus:ring-yellow-700/30"
-              />
-            </div>
+            <TextField
+              label="Strasse*"
+              placeholder="Strasse"
+              value={strasse}
+              onChange={(e) => setStrasse(e.target.value)}
+              required
+            />
+            <TextField
+              label="PLZ/Ort*"
+              placeholder="PLZ/Ort"
+              value={zip}
+              onChange={(e) => setZip(e.target.value)}
+              required
+            />
           </div>
 
           {/* ── Wohnsitzland + Geburtsdatum ── */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="flex flex-col gap-1 min-w-0">
-              <label className="text-xl font-semibold text-yellow-900">Wohnsitzland*</label>
+              <label className={LABEL_CLASS}>Wohnsitzland*</label>
               <CountryDropdown
                 value={residentCountry}
                 onChange={setResidentCountry}
@@ -719,11 +780,11 @@ const Form = () => {
               />
             </div>
             <div className="flex flex-col gap-1 min-w-0 overflow-hidden">
-              <label className="text-xl font-semibold text-yellow-900">Geburtsdatum*</label>
+              <label className={LABEL_CLASS}>Geburtsdatum*</label>
               <Flatpickr
                 value={birthdate}
                 onChange={(d, s) => handleBirthdateChange(s)}
-                options={{ dateFormat: "Y-m-d", maxDate: "today" }}
+                options={birthdateOptions}
                 className="w-full box-border p-2 bg-white border-2 border-yellow-900/5 rounded-lg outline-none focus:border-yellow-700 focus:ring-2 focus:ring-yellow-700/30"
                 placeholder="Geburtsdatum auswählen"
               />
@@ -735,28 +796,22 @@ const Form = () => {
 
           {/* ──Email + Mobile ── */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div className="flex flex-col gap-1">
-              <label className="text-xl font-semibold text-yellow-900">E-Mail Adresse*</label>
-              <input
-                type="email"
-                placeholder="E-Mail Adresse"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="border-2 p-2 bg-white border-yellow-900/5 rounded-lg outline-none focus:border-yellow-700 focus:ring-2 focus:ring-yellow-700/30"
-              />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-xl font-semibold text-yellow-900">Mobile*</label>
-              <input
-                type="tel"
-                placeholder="Mobile"
-                value={mobile}
-                onChange={(e) => setMobile(e.target.value)}
-                className="border-2 p-2 bg-white border-yellow-900/5 rounded-lg outline-none focus:border-yellow-700 focus:ring-2 focus:ring-yellow-700/30"
-                required
-              />
-            </div>
+            <TextField
+              label="E-Mail Adresse*"
+              placeholder="E-Mail Adresse"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+            <TextField
+              label="Mobile*"
+              placeholder="Mobile"
+              type="tel"
+              value={mobile}
+              onChange={(e) => setMobile(e.target.value)}
+              required
+            />
           </div>
 
           {/* ── Reservation Dates (Start / Finish box style) ── */}
@@ -770,7 +825,7 @@ const Form = () => {
                   setEndDate(null);
                   calculatePrice(s, null);
                 }}
-                options={{ dateFormat: "Y-m-d", minDate: "today", disable: reservedDates }}
+                options={startDateOptions}
                 placeholder="Startdatum auswählen"
               />
               <DateField
@@ -780,11 +835,7 @@ const Form = () => {
                   setEndDate(s);
                   calculatePrice(startDate, s);
                 }}
-                options={{
-                  dateFormat: "Y-m-d",
-                  minDate: startDate || "today",
-                  disable: reservedDates,
-                }}
+                options={endDateOptions}
                 placeholder="Rückgabedatum auswählen"
               />
             </div>
@@ -809,16 +860,12 @@ const Form = () => {
 
           {/* ── Führerausweis ── */}
           <div className="grid grid-cols-1 gap-3">
-            <div className="flex flex-col gap-1">
-              <label className="text-xl font-semibold text-yellow-900">Führerausweis*</label>
-              <input
-                type="text"
-                value={licenseNo}
-                onChange={(e) => setLicenseNo(e.target.value)}
-                placeholder="Führerausweis"
-                className="border-2 p-2 bg-white border-yellow-900/5 rounded-lg outline-none focus:border-yellow-700 focus:ring-2 focus:ring-yellow-700/30"
-              />
-            </div>
+            <TextField
+              label="Führerausweis*"
+              placeholder="Führerausweis"
+              value={licenseNo}
+              onChange={(e) => setLicenseNo(e.target.value)}
+            />
           </div>
 
           {/* ── File Uploads: ID Vorder-/Rückseite (attachment-card style) ── */}
@@ -852,88 +899,53 @@ const Form = () => {
           {/* ── Zusatzleistungen ── */}
           <div className="mx-1 flex flex-col gap-2">
             <h3 className="text-xl py-1 font-semibold text-yellow-900">Zusatzleistungen</h3>
-            <div className="flex items-center gap-12 text-yellow-900 text-sm font-semibold">
-              <label>
-                <input
-                  type="checkbox"
-                  name="haftpflicht"
-                  className="mx-1"
-                  checked={redu}
-                  onChange={(e) => setRedu(e.target.checked)}
-                />
-                Selbstbehaltreduktion Haftpflicht auf CHF 500.00 – CHF 12.00 / Tag
-              </label>
-            </div>
-            <div className="flex items-center gap-12 text-yellow-900 text-sm font-semibold">
-              <label>
-                <input
-                  type="checkbox"
-                  name="vollkasko_reduktion"
-                  className="mx-1"
-                  checked={insuRedu}
-                  onChange={(e) => setInsuRedu(e.target.checked)}
-                />
-                Selbstbehaltreduktion Vollkasko auf CHF 500.00 – CHF 15.00 / Tag
-              </label>
-            </div>
-            <div className="flex items-center gap-12 text-yellow-900 text-sm font-semibold">
-              <label>
-                <input
-                  type="checkbox"
-                  checked={kmActive}
-                  onChange={(e) => setkmActive(e.target.checked)}
-                  className="mx-1"
-                />
-                Zusätzliche Kilometer (CHF 0.60 / km)
-              </label>
+
+            <ServiceRow
+              name="haftpflicht"
+              checked={redu}
+              onChange={(e) => setRedu(e.target.checked)}
+              label="Selbstbehaltreduktion Haftpflicht auf CHF 500.00 – CHF 12.00 / Tag"
+            />
+
+            <ServiceRow
+              name="vollkasko_reduktion"
+              checked={insuRedu}
+              onChange={(e) => setInsuRedu(e.target.checked)}
+              label="Selbstbehaltreduktion Vollkasko auf CHF 500.00 – CHF 15.00 / Tag"
+            />
+
+            <ServiceRow
+              checked={kmActive}
+              onChange={(e) => setkmActive(e.target.checked)}
+              label="Zusätzliche Kilometer (CHF 0.60 / km)"
+            >
               {kmActive && (
-                <div className="flex items-center gap-2">
-                  <label>Anzahl Kilometer:</label>
-                  <input
-                    type="number"
-                    value={km === 0 ? "" : km}
-                    min={1}
-                    placeholder="0"
-                    className="bg-white rounded-lg w-10 text-center"
-                    onFocus={(e) => e.target.select()}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setKm(val === "" ? 0 : Number(val));
-                    }}
-                  />
-                  <span>+ CHF {totalKmPrice.toFixed(2)}</span>
-                </div>
-              )}
-            </div>
-            <div className="flex items-center gap-5 text-yellow-900 text-sm font-semibold">
-              <label>
-                <input
-                  type="checkbox"
-                  checked={hourActive}
-                  onChange={(e) => setHourActive(e.target.checked)}
-                  className="mx-1"
+                <AmountInput
+                  label="Anzahl Kilometer:"
+                  value={km}
+                  onChange={(e) => setKm(e.target.value === "" ? 0 : Number(e.target.value))}
+                  suffix={`+ CHF ${totalKmPrice.toFixed(2)}`}
+                  wrapClass="gap-2"
                 />
-                Zusätzliche Stunden (CHF 20.00 / Stunde)
-              </label>
-              {hourActive && (
-                <div className="flex items-center gap-1">
-                  <label>Anzahl Stunden:</label>
-                  <input
-                    type="number"
-                    value={hour === 0 ? "" : hour}
-                    min={1}
-                    placeholder="0"
-                    className="bg-white rounded-lg w-10 text-center"
-                    onFocus={(e) => e.target.select()}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setHour(val === "" ? 0 : Number(val));
-                    }}
-                  />
-                  <span>+ CHF {totalHoursPrice.toFixed(2)}</span>
-                </div>
               )}
-            </div>
+            </ServiceRow>
+
+            <ServiceRow
+              rowClass="gap-5"
+              checked={hourActive}
+              onChange={(e) => setHourActive(e.target.checked)}
+              label="Zusätzliche Stunden (CHF 20.00 / Stunde)"
+            >
+              {hourActive && (
+                <AmountInput
+                  label="Anzahl Stunden:"
+                  value={hour}
+                  onChange={(e) => setHour(e.target.value === "" ? 0 : Number(e.target.value))}
+                  suffix={`+ CHF ${totalHoursPrice.toFixed(2)}`}
+                  wrapClass="gap-1"
+                />
+              )}
+            </ServiceRow>
           </div>
 
           <p className="text-yellow-950 font-bold text-2xl">
@@ -979,9 +991,10 @@ const Form = () => {
           {/* ── Submit Button ── */}
           <button
             type="submit"
+            disabled={submitting}
             className="bg-yellow-900 text-white p-3 rounded-lg mt-3 cursor-pointer disabled:cursor-auto disabled:opacity-50"
           >
-            Jetzt Reservieren
+            {submitting ? "Wird gespeichert..." : "Jetzt Reservieren"}
           </button>
         </form>
 
