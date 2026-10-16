@@ -18,7 +18,7 @@ const Imprint=()=>{
                 </div>
                 <div>
                     <h3 className="text-lg font-semibold">Telefon / WhatsApp:  </h3>
-                    <p className='indent'>+41 764711672</p>
+                    <p className='indent'>+41 78 471 16 72</p>
                 </div>
                 <div>
                     <h3 className="text-lg font-semibold">E-Mail:  </h3>

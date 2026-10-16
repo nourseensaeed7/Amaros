@@ -10,7 +10,7 @@ const Terms=()=>{
                 <ol className='list-decimal  indent font-semibold'>
                     <li className='m-2'>
                         <h2 className="text-xl">Geltungsbereich</h2>
-                        <p className='font-medium'>Diese Allgemeinen Geschäftsbedingungen gelten für alle Dienstleistungen und Angebote von Amaros – Inhaber Solomon.</p>
+                        <p className='font-medium'>Diese Allgemeinen Geschäftsbedingungen gelten für alle Dienstleistungen und Angebote von Amaros Inh. Soliman.</p>
                     </li>
                     <li className='m-2'>
                         <h2 className="text-xl">Vertragsabschluss</h2>

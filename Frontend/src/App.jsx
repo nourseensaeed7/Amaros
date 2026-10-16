@@ -60,9 +60,10 @@ const App = () => {
         }}
         expires={365}
       >
-        Diese Website verwendet Cookies, um die Nutzererfahrung zu verbessern.
-        Weitere Informationen finden Sie in unserer{" "}
-        <a href="/Amaros/terms.pdf" style={{ color: "#e94560" }}>
+        Mit Ihrer Zustimmung erfassen wir eine anonyme Besucherstatistik
+        (dafür wird Ihre IP-Adresse zur Standortermittlung an ipapi.co, USA,
+        übermittelt). Weitere Informationen finden Sie in unserer{" "}
+        <a href="#/Policy" style={{ color: "#e94560" }}>
           Datenschutzerklärung
         </a>
         .

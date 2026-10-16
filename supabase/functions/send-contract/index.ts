@@ -1,11 +1,15 @@
 // supabase/functions/send-contract/index.ts
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
 import { PDFDocument } from "https://esm.sh/pdf-lib@1.17.1";
+import { esc } from "../_shared/security.ts";
 
 const SUPABASE_URL         = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SB_SERVICE_KEY")!;
+// Shared secret the database webhook sends as the "x-webhook-secret" header.
+// Without it anyone holding the public anon key could trigger contract emails.
+const WEBHOOK_SECRET       = Deno.env.get("WEBHOOK_SECRET");
 // ── Brevo (Sendinblue) email ──────────────────────────────────────────────────
 // Get a key at Brevo → SMTP & API → API Keys, then add it as a Supabase secret:
 //   supabase secrets set BREVO_API_KEY=xkeysib-...
@@ -39,16 +43,36 @@ function slugify(name: string): string {
 
 serve(async (req) => {
   try {
-    const body        = await req.json();
-    const reservation = body.record;
+    if (!WEBHOOK_SECRET || req.headers.get("x-webhook-secret") !== WEBHOOK_SECRET) {
+      return new Response("Unauthorized", { status: 401 });
+    }
 
-    if (!reservation?.id) {
+    const body = await req.json();
+    if (!body.record?.id) {
       return new Response("No reservation data", { status: 400 });
     }
 
-    console.log(`Processing reservation: ${reservation.id}`);
-
     const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+
+    // Re-read the row instead of trusting the payload's prices and ids.
+    const { data: reservation, error: resError } = await sb
+      .from("reservations")
+      .select("*")
+      .eq("id", body.record.id)
+      .single();
+
+    if (resError || !reservation) {
+      throw new Error(`Reservation not found: ${resError?.message}`);
+    }
+
+    // Only the first webhook call per booking generates and emails a contract.
+    if (reservation.contract_status !== "pending") {
+      return new Response(JSON.stringify({ skipped: true }), {
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    console.log(`Processing reservation: ${reservation.id}`);
 
     // ── 1. Fetch customer ────────────────────────────────────────────────────
     const { data: customer, error: custError } = await sb
@@ -260,7 +284,7 @@ serve(async (req) => {
     }
     const pdfBase64 = btoa(binary);
 
-    const customerName = `${customer.first_name} ${customer.last_name}`;
+    const customerName = esc(`${customer.first_name} ${customer.last_name}`);
 
     // ── 9. Email customer ─────────────────────────────────────────────────────
     await sendEmail({
@@ -277,7 +301,7 @@ serve(async (req) => {
             <p>Im Anhang finden Sie Ihren ausgefüllten Fahrzeugmietvertrag (Ref: <b>#${bookingRef}</b>).</p>
             <table style="background:#f8f8f8;border-radius:8px;padding:14px;width:100%;margin:16px 0;border-collapse:collapse;">
               <tr><td style="padding:5px 10px;font-weight:bold;width:140px;">Fahrzeug:</td>
-                  <td style="padding:5px 10px;">${vehicle.name}</td></tr>
+                  <td style="padding:5px 10px;">${esc(vehicle.name)}</td></tr>
               <tr><td style="padding:5px 10px;font-weight:bold;">Abholdatum:</td>
                   <td style="padding:5px 10px;">${fmtDate(reservation.start_date)}</td></tr>
               <tr><td style="padding:5px 10px;font-weight:bold;">Rückgabedatum:</td>
@@ -302,15 +326,15 @@ serve(async (req) => {
     // ── 10. Notify owner ──────────────────────────────────────────────────────
     await sendEmail({
       to:      OWNER_EMAIL,
-      subject: `📋 Neuer Vertrag gesendet – Buchung #${bookingRef}`,
+      subject: `Neuer Vertrag gesendet – Buchung #${bookingRef}`,
       html: `
         <div style="font-family:Arial,sans-serif;max-width:500px;">
           <h2>Neuer Mietvertrag gesendet</h2>
           <table style="width:100%;border-collapse:collapse;">
             <tr><td style="padding:6px;font-weight:bold;">Buchung:</td><td>#${bookingRef}</td></tr>
             <tr><td style="padding:6px;font-weight:bold;">Kunde:</td><td>${customerName}</td></tr>
-            <tr><td style="padding:6px;font-weight:bold;">Email:</td><td>${customer.email}</td></tr>
-            <tr><td style="padding:6px;font-weight:bold;">Fahrzeug:</td><td>${vehicle.name}</td></tr>
+            <tr><td style="padding:6px;font-weight:bold;">Email:</td><td>${esc(customer.email)}</td></tr>
+            <tr><td style="padding:6px;font-weight:bold;">Fahrzeug:</td><td>${esc(vehicle.name)}</td></tr>
             <tr><td style="padding:6px;font-weight:bold;">Zeitraum:</td>
                 <td>${fmtDate(reservation.start_date)} → ${fmtDate(reservation.end_date)}</td></tr>
             <tr><td style="padding:6px;font-weight:bold;">Gesamtpreis:</td>
@@ -329,7 +353,7 @@ serve(async (req) => {
 
   } catch (err) {
     console.error("Edge function error:", err);
-    return new Response(JSON.stringify({ error: String(err) }), {
+    return new Response(JSON.stringify({ error: "Contract generation failed" }), {
       status: 500,
       headers: { "Content-Type": "application/json" },
     });

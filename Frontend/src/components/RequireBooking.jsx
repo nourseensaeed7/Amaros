@@ -5,7 +5,7 @@ export default function RequireBooking({ children }) {
 
   // Only allow access if navigated here with a reservationId
   // Otherwise redirect back to vans page so they can pick a van first
-  if (!location.state?.reservationId) {
+  if (!location.state?.reservationId || !location.state?.token) {
     return <Navigate to="/vans" replace />;
   }
 

@@ -16,6 +16,7 @@ export default function SignContract() {
   const location      = useLocation();
   const navigate      = useNavigate();
   const reservationId = location.state?.reservationId;
+  const token         = location.state?.token;
 
   const [pdfUrl,      setPdfUrl]      = useState(null);
   const [pdfBytes,    setPdfBytes]    = useState(null);
@@ -51,7 +52,7 @@ export default function SignContract() {
       // service role key on the server to fetch them.
       const { data: loadData, error: loadError } = await supabase.functions.invoke(
         "contract-data",
-        { body: { action: "load", reservationId } }
+        { body: { action: "load", reservationId, token } }
       );
 
       if (loadError || loadData?.error || !loadData?.reservation) {
@@ -63,44 +64,32 @@ export default function SignContract() {
       setCustomer(res.customers);
 
       // Poll until Edge Function generates the PDF (max 30s)
-      let contractPath = res.contract_path;
+      let contractUrl = loadData.contractUrl;
       let attempts = 0;
 
-      while (!contractPath && attempts < 15) {
+      while (!contractUrl && attempts < 15) {
         setLoadingMsg(`Vertrag wird erstellt... (${attempts + 1}/15)`);
         await new Promise((r) => setTimeout(r, 2000));
 
         const { data: statusData } = await supabase.functions.invoke(
           "contract-data",
-          { body: { action: "status", reservationId } }
+          { body: { action: "status", reservationId, token } }
         );
-        contractPath = statusData?.contractPath;
+        contractUrl = statusData?.contractUrl;
         attempts++;
-        console.log(`Attempt ${attempts}: contract_path = ${contractPath}`);
       }
 
-      if (!contractPath)
+      if (!contractUrl)
         throw new Error("Vertrag konnte nicht erstellt werden. Bitte kontaktieren Sie uns.");
 
       setLoadingMsg("PDF wird geladen...");
 
-      // Get signed URL for PDF (valid 1 hour)
-      const { data: urlData, error: urlError } = await supabase.storage
-        .from("contracts")
-        .createSignedUrl(contractPath, 3600);
-
-      console.log("contractPath:", contractPath);
-      console.log("urlData:", urlData);
-      console.log("urlError:", urlError);
-
-      if (!urlData?.signedUrl)
-        throw new Error("PDF konnte nicht geladen werden.");
-
-      // Download PDF bytes for signing
-      const response = await fetch(urlData.signedUrl);
+      // Download PDF bytes for signing (signed URL from the server, valid 1 hour)
+      const response = await fetch(contractUrl);
+      if (!response.ok) throw new Error("PDF konnte nicht geladen werden.");
       const bytes    = await response.arrayBuffer();
 
-      setPdfUrl(urlData.signedUrl);
+      setPdfUrl(contractUrl);
       setPdfBytes(bytes);
       setLoading(false);
     } catch (err) {
@@ -195,15 +184,19 @@ export default function SignContract() {
       );
 
       const signedPdfBytes = await pdfDoc.save();
-      const bookingRef     = String(reservationId).padStart(6, "0");
-      const signedPath     = `${reservationId}/Mietvertrag_${bookingRef}_signed.pdf`;
 
-      // Upload signed PDF
+      // Upload signed PDF via a one-time URL — the contracts bucket has no
+      // public access; the server fixes the path.
+      const { data: up, error: upError } = await supabase.functions.invoke(
+        "contract-data",
+        { body: { action: "upload-url", reservationId, token } }
+      );
+      if (upError || up?.error) throw new Error(up?.error || "Upload fehlgeschlagen.");
+
       const { error: uploadError } = await supabase.storage
         .from("contracts")
-        .upload(signedPath, signedPdfBytes, {
+        .uploadToSignedUrl(up.path, up.uploadToken, signedPdfBytes, {
           contentType: "application/pdf",
-          upsert: true,
         });
 
       if (uploadError) throw new Error("Upload fehlgeschlagen.");
@@ -212,20 +205,16 @@ export default function SignContract() {
       // anymore, so this goes through the edge function (service role).
       const { data: completeData, error: completeError } = await supabase.functions.invoke(
         "contract-data",
-        { body: { action: "complete", reservationId, signedPath } }
+        { body: { action: "complete", reservationId, token } }
       );
 
       if (completeError || completeData?.error) {
         throw new Error(completeData?.error || "Fehler beim Aktualisieren der Buchung.");
       }
 
-      // ✅ Generate download URL for the signed PDF
-      const { data: signedUrlData } = await supabase.storage
-        .from("contracts")
-        .createSignedUrl(signedPath, 3600);
-
-      if (signedUrlData?.signedUrl) {
-        setSignedUrl(signedUrlData.signedUrl);
+      // ✅ Download URL for the signed PDF
+      if (completeData?.signedUrl) {
+        setSignedUrl(completeData.signedUrl);
       }
 
       setSigned(true);
