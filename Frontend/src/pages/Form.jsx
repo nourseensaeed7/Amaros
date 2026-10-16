@@ -432,11 +432,16 @@ const Form = () => {
 
   const totalKmPrice = km * kmPrice;
   const totalHoursPrice = hourPrice * hour;
+  // Inclusive day count, same formula as calculatePrice and the server.
+  const days = startDate && endDate
+    ? Math.max(1, Math.ceil((new Date(endDate) - new Date(startDate)) / 86400000) + 1)
+    : 0;
+  // Reductions are advertised "/ Tag", so they scale with the rental length.
   const extraTotal =
-    (redu ? reductionPrice : 0) +
+    (redu ? reductionPrice * days : 0) +
     (kmActive ? totalKmPrice : 0) +
     (hourActive ? totalHoursPrice : 0) +
-    (insuRedu ? volkasko : 0);
+    (insuRedu ? volkasko * days : 0);
   const total = Number(extraTotal + totalPrice);
 
   // ── Flatpickr options (memoized) ──
@@ -486,10 +491,8 @@ const Form = () => {
 
   // ── Load reserved dates ──
   const loadReservedDates = async () => {
-    const { data, error } = await supabase
-      .from("reservations")
-      .select("start_date, end_date")
-      .eq("car_id", Number(id));
+    // reservations isn't readable by anon; this RPC returns only booked dates.
+    const { data, error } = await supabase.rpc("reserved_dates", { p_car_id: Number(id) });
     if (error) return console.error(error);
     if (data)
       setReservedDates(data.map((item) => ({ from: item.start_date, to: item.end_date })));
@@ -525,7 +528,8 @@ const Form = () => {
   const uploadFile = async (file, folder) => {
     if (!file) return null;
     const fileExt = file.name.split(".").pop();
-    const filePath = `${folder}/${folder}_${Date.now()}.${fileExt}`;
+    // Random name: timestamps are guessable, and create-reservation only accepts uuid paths.
+    const filePath = `${folder}/${crypto.randomUUID()}.${fileExt}`;
     const { error } = await supabase.storage.from("files").upload(filePath, file);
     if (error) { console.error(error); return null; }
     return filePath;
@@ -652,7 +656,7 @@ const Form = () => {
       // unmounts this page.
       setTimeout(() => {
         navigate(`/Van-Form/${id}/sign-contract`, {
-          state: { reservationId: newReservationId },
+          state: { reservationId: newReservationId, token: createData.token },
         });
       }, 800);
 

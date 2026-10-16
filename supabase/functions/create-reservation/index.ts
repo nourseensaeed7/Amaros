@@ -7,7 +7,8 @@
 // so a malicious client can't bypass the React form's checks.
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
+import { bookingToken, isUploadPath } from "../_shared/security.ts";
 
 const SUPABASE_URL         = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SB_SERVICE_KEY")!;
@@ -20,8 +21,10 @@ const corsHeaders = {
 // ─── Pricing constants — keep in sync with the labels shown in Form.jsx ───────
 const KM_RATE          = 0.60;   // CHF per extra km
 const HOUR_RATE        = 20.00;  // CHF per extra hour
-const HAFTPFLICHT_FLAT = 12.00;  // CHF, one-time (flat) when selected
-const VOLLKASKO_FLAT   = 15.00;  // CHF, one-time (flat) when selected
+const HAFTPFLICHT_PER_DAY = 12.00;  // CHF per rental day when selected ("/ Tag" in Form.jsx and the contract)
+const VOLLKASKO_PER_DAY   = 15.00;  // CHF per rental day when selected
+
+const MAX_OPEN_BOOKINGS_PER_EMAIL = 3;
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -52,8 +55,8 @@ function computePrice(pricePerDay: unknown, r: Record<string, unknown>) {
 
   const extraKmPrice    = round2(km * KM_RATE);
   const extraHoursPrice = round2(hours * HOUR_RATE);
-  const haftpflicht     = r.haftpflicht_reduktion ? HAFTPFLICHT_FLAT : 0; // flat, one-time
-  const vollkasko       = r.vollkasko_reduktion   ? VOLLKASKO_FLAT   : 0; // flat, one-time
+  const haftpflicht     = r.haftpflicht_reduktion ? HAFTPFLICHT_PER_DAY * days : 0;
+  const vollkasko       = r.vollkasko_reduktion   ? VOLLKASKO_PER_DAY   * days : 0;
 
   const extraTotal = round2(extraKmPrice + extraHoursPrice + haftpflicht + vollkasko);
   const totalPrice = round2(basePrice + extraTotal);
@@ -73,9 +76,9 @@ serve(async (req) => {
   }
 
   try {
-    const { customer, reservation } = await req.json();
+    const { customer: input, reservation } = await req.json();
 
-    if (!customer || !reservation) {
+    if (!input || !reservation) {
       return json({ error: "Missing customer or reservation data" }, 400);
     }
 
@@ -87,9 +90,29 @@ serve(async (req) => {
       "id_front_path", "id_back_path",
       "address", "zip",
     ];
+    // Only these columns may be written — anything else the client sends is dropped.
+    const customerFields = [...requiredCustomerFields, "customer_type", "firma_name", "birthdate"];
+    const customer: Record<string, string | null> = {};
+    for (const field of customerFields) {
+      const v = input[field];
+      if (v != null && (typeof v !== "string" || v.length > 200)) {
+        return json({ error: `Invalid field: ${field}` }, 400);
+      }
+      customer[field] = v?.trim() || null;
+    }
     for (const field of requiredCustomerFields) {
       if (!customer[field]) {
         return json({ error: `Missing required field: ${field}` }, 400);
+      }
+    }
+    customer.email = customer.email!.toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customer.email)) {
+      return json({ error: "Ungültige E-Mail-Adresse." }, 400);
+    }
+    // Uploads must be files the browser just put in its own folder, not arbitrary paths.
+    for (const folder of ["license_front", "license_back", "id_front", "id_back"]) {
+      if (!isUploadPath(customer[`${folder}_path`], folder)) {
+        return json({ error: `Invalid upload path: ${folder}` }, 400);
       }
     }
 
@@ -131,6 +154,21 @@ serve(async (req) => {
 
     const price = computePrice(vehicle.price_per_day, reservation);
 
+    // Each booking emails a contract to this address — cap open bookings per
+    // address so the form can't be used to flood someone's inbox.
+    // shortcut: per-email only; add Turnstile/IP limits if bots rotate addresses.
+    const { data: sameEmail } = await sb.from("customers").select("id").eq("email", customer.email);
+    if (sameEmail?.length) {
+      const { count } = await sb
+        .from("reservations")
+        .select("id", { count: "exact", head: true })
+        .in("customer_id", sameEmail.map((c) => c.id))
+        .in("contract_status", ["pending", "sent"]);
+      if ((count ?? 0) >= MAX_OPEN_BOOKINGS_PER_EMAIL) {
+        return json({ error: "Zu viele offene Buchungen für diese E-Mail-Adresse. Bitte kontaktieren Sie uns." }, 429);
+      }
+    }
+
     // ── Insert customer ───────────────────────────────────────────────────
     const { data: newCustomer, error: customerError } = await sb
       .from("customers")
@@ -139,7 +177,8 @@ serve(async (req) => {
       .single();
 
     if (customerError || !newCustomer) {
-      return json({ error: customerError?.message || "Failed to create customer" }, 500);
+      console.error("create-reservation customer error:", customerError);
+      return json({ error: "Kunde konnte nicht gespeichert werden." }, 500);
     }
 
     // ── Insert reservation (prices from the server, not the client) ───────
@@ -170,13 +209,18 @@ serve(async (req) => {
       .single();
 
     if (reservationError || !newReservation) {
-      return json({ error: reservationError?.message || "Failed to create reservation" }, 500);
+      console.error("create-reservation reservation error:", reservationError);
+      return json({ error: "Reservierung konnte nicht gespeichert werden." }, 500);
     }
 
-    return json({ reservationId: newReservation.id, totalPrice: price.totalPrice });
+    return json({
+      reservationId: newReservation.id,
+      token:         await bookingToken(SUPABASE_SERVICE_KEY, newReservation.id),
+      totalPrice:    price.totalPrice,
+    });
 
   } catch (err) {
     console.error("create-reservation error:", err);
-    return json({ error: String(err) }, 500);
+    return json({ error: "Interner Fehler." }, 500);
   }
 });
