@@ -111,7 +111,10 @@ serve(async (req) => {
       .download(templatePath);
 
     if (dlError || !templateData) {
-      throw new Error(`Template download failed: ${dlError?.message}`);
+      // storage-js reports download errors as "{}"; show the HTTP status and body.
+      const res = (dlError as { originalError?: unknown } | null)?.originalError;
+      const detail = res instanceof Response ? `${res.status} ${await res.text()}` : dlError?.message;
+      throw new Error(`Template download failed (${templatePath}): ${detail}`);
     }
 
     const templateBytes = await templateData.arrayBuffer();
