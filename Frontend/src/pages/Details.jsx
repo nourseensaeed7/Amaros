@@ -134,6 +134,7 @@ const Details = () => {
             <a
               href="https://www.google.com/maps/search/?api=1&query=Mandachstrasse+50,+8155+Niederhasli,+Switzerland"
               target="_blank"
+              rel="noopener noreferrer"
               className="underline indent text-base font-mono hover:text-blue-700"
             >
               Google Maps Route öffnen

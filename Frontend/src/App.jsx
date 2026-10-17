@@ -1,4 +1,4 @@
-import React from "react";
+import React, { lazy, Suspense } from "react";
 import { HashRouter, Routes, Route } from "react-router-dom";
 import CookieConsent from "react-cookie-consent";
 import { useTracking } from "./hooks/useTracking";
@@ -13,7 +13,8 @@ import Policy from "./pages/Policy.jsx";
 import Terms from "./pages/Terms.jsx";
 import About from "./pages/About.jsx";
 import RequireBooking from "./components/RequireBooking";
-import SignContract from "./pages/SignContract";
+// Loaded only on the signing page: it pulls in pdf-lib (~half the bundle).
+const SignContract = lazy(() => import("./pages/SignContract"));
 
 function TrackingWrapper() {
   useTracking();
@@ -36,7 +37,7 @@ const App = () => {
         <Route path="/about-us" element={<About />} />
           <Route path="/Van-Form/:id/sign-contract" element={
             <RequireBooking>
-              <SignContract />
+              <Suspense fallback={null}><SignContract /></Suspense>
             </RequireBooking>
           } />
       </Routes>

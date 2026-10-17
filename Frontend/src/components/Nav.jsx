@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+
 import { FaBars, FaTimes } from "react-icons/fa";
 import logo from "../assets/logo.png";
 import { FaWhatsapp } from "react-icons/fa";
@@ -8,7 +8,7 @@ import { FaInstagram } from "react-icons/fa";
 import { Link } from "react-router-dom";
 const Navbar = () => {
   const [open, setOpen] = useState(false);
-  const navigate = useNavigate();
+
 
   return (
     <>
@@ -27,9 +27,9 @@ const Navbar = () => {
           <Link to="/">
             <div className="flex items-center gap-2">
               <img src={logo} alt="logo" className="h-12 w-auto" />
-              <h1 className=" bg-gradient-to-r from-yellow-700 via-yellow-500 to-yellow-800 text-transparent bg-clip-text tracking-widest cinzel text-3xl">
+              <span className=" bg-gradient-to-r from-yellow-700 via-yellow-500 to-yellow-800 text-transparent bg-clip-text tracking-widest cinzel text-3xl">
                 Amaros
-              </h1>
+              </span>
             </div>
           </Link>
           {/* Desktop Menu */}
@@ -38,23 +38,23 @@ const Navbar = () => {
               <Link to="/">Home</Link>
             </li>
             <li className="cursor-pointer transition-all duration-400 ease-in-out hover:bg-gradient-to-r from-yellow-700 via-yellow-500 to-yellow-800 hover:text-transparent bg-clip-text">
-              <a onClick={()=>navigate('/about-us')}>Über uns</a>
+              <Link to="/about-us">Über uns</Link>
             </li>
             <li className="cursor-pointer transition-all duration-400 ease-in-out hover:bg-gradient-to-r from-yellow-700 via-yellow-500 to-yellow-800 hover:text-transparent bg-clip-text">
-              <a onClick={() => navigate("/vans")}>Alle Lieferwagen</a>
+              <Link to="/vans">Alle Lieferwagen</Link>
             </li>
             <li className="cursor-pointer transition-all duration-400 ease-in-out hover:bg-gradient-to-r from-yellow-700 via-yellow-500 to-yellow-800 hover:text-transparent bg-clip-text">
-              <a onClick={() => navigate("/Rental-Instructions")}>Mietprozess</a>
+              <Link to="/Rental-Instructions">Mietprozess</Link>
             </li>
             <li className="flex items-center gap-4  text-3xl">
               <div>
-                <a href="https://wa.me/message/WP5JU4QYGPTYB1"  target="blank"><FaWhatsapp /></a>
+                <a href="https://wa.me/message/WP5JU4QYGPTYB1"  target="_blank" rel="noopener noreferrer"><FaWhatsapp /></a>
               </div>
               <div>
-                <a href="https://www.instagram.com/amaros_transport_zh?igsh=MWFidDlpMnN4Z216cw%3D%3D&utm_source=qr" target="blank"><FaInstagram /></a>
+                <a href="https://www.instagram.com/amaros_transport_zh?igsh=MWFidDlpMnN4Z216cw%3D%3D&utm_source=qr" target="_blank" rel="noopener noreferrer"><FaInstagram /></a>
               </div>
               <div>
-                <a href="https://www.facebook.com/share/1B2ZrCie4T/?mibextid=wwXIfr" target="blank"><FaFacebookSquare /></a>
+                <a href="https://www.facebook.com/share/1B2ZrCie4T/?mibextid=wwXIfr" target="_blank" rel="noopener noreferrer"><FaFacebookSquare /></a>
               </div>
 
             </li>
@@ -88,13 +88,13 @@ const Navbar = () => {
             <Link to="/">Home</Link>
           </li>
             <li className="cursor-pointer transition-all duration-400 ease-in-out hover:bg-gradient-to-r from-yellow-700 via-yellow-500 to-yellow-800 hover:text-transparent bg-clip-text">
-            <a onClick={()=>navigate('/about-us')}>Über uns</a>
+            <Link to="/about-us">Über uns</Link>
           </li>
             <li className="cursor-pointer transition-all duration-400 ease-in-out hover:bg-gradient-to-r from-yellow-700 via-yellow-500 to-yellow-800 hover:text-transparent bg-clip-text">
-            <a onClick={() => navigate("/vans")}>Alle Lieferwagen</a>
+            <Link to="/vans">Alle Lieferwagen</Link>
           </li>
             <li className="cursor-pointer transition-all duration-400 ease-in-out hover:bg-gradient-to-r from-yellow-700 via-yellow-500 to-yellow-800 hover:text-transparent bg-clip-text">
-              <a onClick={() => navigate("/Rental-Instructions")}>Mietprozess</a>
+              <Link to="/Rental-Instructions">Mietprozess</Link>
           </li>
         </ul>
       </div>
