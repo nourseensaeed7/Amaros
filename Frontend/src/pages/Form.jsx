@@ -39,15 +39,16 @@ function ToastContainer({ toasts, onDismiss }) {
   );
 }
 
+// German names: the site is German, so customers search "Schweiz", not "Switzerland".
 const EUROPE_COUNTRIES = [
-  "Albania", "Andorra", "Austria", "Belarus", "Belgium", "Bosnia and Herzegovina",
-  "Bulgaria", "Croatia", "Cyprus", "Czechia", "Denmark", "Estonia", "Finland",
-  "France", "Germany", "Greece", "Hungary", "Iceland", "Ireland", "Italy",
-  "Kosovo", "Latvia", "Liechtenstein", "Lithuania", "Luxembourg", "Malta",
-  "Moldova", "Monaco", "Montenegro", "Netherlands", "North Macedonia", "Norway",
-  "Poland", "Portugal", "Romania", "Russia", "San Marino", "Serbia", "Slovakia",
-  "Slovenia", "Spain", "Sweden", "Switzerland", "Turkey", "Ukraine",
-  "United Kingdom", "Vatican City",
+  "Schweiz", "Deutschland", "Österreich", "Liechtenstein", "Frankreich", "Italien",
+  "Albanien", "Andorra", "Belarus", "Belgien", "Bosnien und Herzegowina",
+  "Bulgarien", "Dänemark", "Estland", "Finnland", "Griechenland", "Irland",
+  "Island", "Kosovo", "Kroatien", "Lettland", "Litauen", "Luxemburg", "Malta",
+  "Moldau", "Monaco", "Montenegro", "Niederlande", "Nordmazedonien", "Norwegen",
+  "Polen", "Portugal", "Rumänien", "Russland", "San Marino", "Schweden", "Serbien",
+  "Slowakei", "Slowenien", "Spanien", "Tschechien", "Türkei", "Ukraine", "Ungarn",
+  "Vatikanstadt", "Vereinigtes Königreich", "Zypern",
 ];
 
 // ─── Flatpickr calendar visual fixes ─────────────────────────────────────────
