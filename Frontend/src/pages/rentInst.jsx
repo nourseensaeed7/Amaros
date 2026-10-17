@@ -11,19 +11,19 @@ const rentInst = () => {
         "Fülle das Mietformular mit deinen persönlichen Daten, dem gewünschten Mietzeitraum und deinem bevorzugten Van aus.",
     },
     {
-      title: "Vertrag per WhatsApp erhalten",
+      title: "Vertrag online unterschreiben",
       description:
-        "Nach dem Absenden des Formulars erhältst du deinen Mietvertrag direkt per WhatsApp.",
+        "Direkt nach dem Absenden siehst du deinen Mietvertrag. Prüfe ihn sorgfältig und unterschreibe ihn online innerhalb von 2 Stunden – sonst wird die Reservierung wieder freigegeben.",
     },
     {
-      title: "Vertrag unterschreiben & zurücksenden",
+      title: "Kopie per E-Mail",
       description:
-        "Bitte prüfe den Vertrag sorgfältig, unterschreibe ihn und sende ihn per WhatsApp an uns zurück.",
+        "Nach der Unterschrift erhältst du den unterschriebenen Vertrag per E-Mail.",
     },
     {
       title: "Buchungsbestätigung",
       description:
-        "Sobald wir den unterschriebenen Vertrag erhalten haben, bestätigen wir deine Buchung ebenfalls per WhatsApp.",
+        "Wir prüfen deine Buchung und bestätigen sie dir per E-Mail. Bei Fragen erreichst du uns jederzeit per WhatsApp.",
     },
     {
       title: "Zugangscode am Miettag erhalten",

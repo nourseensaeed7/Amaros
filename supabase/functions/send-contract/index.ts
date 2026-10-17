@@ -41,6 +41,21 @@ function slugify(name: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
+const fmtDate = (d: string) => {
+  if (!d) return "";
+  const [y, m, day] = d.split("-");
+  return `${day}.${m}.${y}`;
+};
+
+const fmtChf = (n: number | null) =>
+  n != null && n > 0 ? `${Number(n).toFixed(2)}` : "-";
+
+const toBase64 = (bytes: Uint8Array) => {
+  let binary = "";
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary);
+};
+
 serve(async (req) => {
   try {
     if (!WEBHOOK_SECRET || req.headers.get("x-webhook-secret") !== WEBHOOK_SECRET) {
@@ -63,13 +78,6 @@ serve(async (req) => {
 
     if (resError || !reservation) {
       throw new Error(`Reservation not found: ${resError?.message}`);
-    }
-
-    // Only the first webhook call per booking generates and emails a contract.
-    if (reservation.contract_status !== "pending") {
-      return new Response(JSON.stringify({ skipped: true }), {
-        headers: { "Content-Type": "application/json" },
-      });
     }
 
     console.log(`Processing reservation: ${reservation.id}`);
@@ -95,6 +103,25 @@ serve(async (req) => {
     if (carError || !vehicle) {
       throw new Error(`Vehicle not found: ${carError?.message}`);
     }
+
+    const bookingRef = String(reservation.id).padStart(6, "0");
+    const done = (body: unknown) =>
+      new Response(JSON.stringify(body), { headers: { "Content-Type": "application/json" } });
+
+    // UPDATE events: email the customer/owner when the status changes.
+    // The statuses come from the webhook payload (old -> new) so a late event
+    // can't be mistaken for a newer change; the row data comes from the DB.
+    if (body.type === "UPDATE") {
+      const from = body.old_record?.contract_status;
+      const to   = body.record?.contract_status;
+      if (from === to) return done({ skipped: true });
+      const sent = await sendStatusEmails(sb, { reservation, customer, vehicle, bookingRef, from, to });
+      return done({ success: true, ref: bookingRef, emails: sent });
+    }
+
+    // INSERT: generate the (unsigned) contract once. The customer signs it on
+    // the website right away; emails go out after signing (UPDATE above).
+    if (reservation.contract_status !== "pending") return done({ skipped: true });
 
     // ── 3. Pick this car's template and download it ─────────────────────────
     const templatePath = TEMPLATES[vehicle.name];
@@ -149,16 +176,6 @@ serve(async (req) => {
       }
     };
 
-    const fmtDate = (d: string) => {
-      if (!d) return "";
-      const [y, m, day] = d.split("-");
-      return `${day}.${m}.${y}`;
-    };
-
-    const fmtChf = (n: number | null) =>
-      n != null && n > 0 ? `${Number(n).toFixed(2)}` : "-";
-
-    const bookingRef  = String(reservation.id).padStart(6, "0");
     // No dedicated "protokoll_Nr" column exists yet — reusing bookingRef.
     const protokollNr = bookingRef;
 
@@ -272,87 +289,15 @@ serve(async (req) => {
 
     if (uploadError) throw new Error(`Upload failed: ${uploadError.message}`);
 
-    // ── 7. Update reservation status ─────────────────────────────────────────
+    // ── 7. Update reservation status (fires an UPDATE event, ignored above) ──
     await sb.from("reservations").update({
       contract_status:  "sent",
       contract_path:    storagePath,
       contract_sent_at: new Date().toISOString(),
     }).eq("id", reservation.id);
 
-    // ── 8. Convert PDF to base64 for email ───────────────────────────────────
-    const uint8Array = new Uint8Array(filledPdfBytes);
-    let binary = "";
-    for (let i = 0; i < uint8Array.length; i++) {
-      binary += String.fromCharCode(uint8Array[i]);
-    }
-    const pdfBase64 = btoa(binary);
-
-    const customerName = esc(`${customer.first_name} ${customer.last_name}`);
-
-    // ── 9. Email customer ─────────────────────────────────────────────────────
-    await sendEmail({
-      to:      customer.email,
-      subject: `Ihr Mietvertrag – Ref #${bookingRef} – Bitte unterschreiben`,
-      html: `
-        <div style="font-family:Arial,sans-serif;max-width:580px;margin:auto;color:#333;">
-          <div style="background:#1a1a2e;color:white;padding:24px 30px;border-radius:10px 10px 0 0;">
-            <h2 style="margin:0;">🚐 Amaros Fahrzeugvermietung</h2>
-            <p style="margin:6px 0 0;color:#aaa;font-size:13px;">Ihr Mietvertrag ist bereit</p>
-          </div>
-          <div style="padding:28px 30px;border:1px solid #eee;border-top:none;border-radius:0 0 10px 10px;">
-            <p>Guten Tag <b>${customerName}</b>,</p>
-            <p>Im Anhang finden Sie Ihren ausgefüllten Fahrzeugmietvertrag (Ref: <b>#${bookingRef}</b>).</p>
-            <table style="background:#f8f8f8;border-radius:8px;padding:14px;width:100%;margin:16px 0;border-collapse:collapse;">
-              <tr><td style="padding:5px 10px;font-weight:bold;width:140px;">Fahrzeug:</td>
-                  <td style="padding:5px 10px;">${esc(vehicle.name)}</td></tr>
-              <tr><td style="padding:5px 10px;font-weight:bold;">Abholdatum:</td>
-                  <td style="padding:5px 10px;">${fmtDate(reservation.start_date)}</td></tr>
-              <tr><td style="padding:5px 10px;font-weight:bold;">Rückgabedatum:</td>
-                  <td style="padding:5px 10px;">${fmtDate(reservation.end_date)}</td></tr>
-              <tr><td style="padding:5px 10px;font-weight:bold;">Gesamtpreis:</td>
-                  <td style="padding:5px 10px;">${fmtChf(reservation.total_price)}</td></tr>
-            </table>
-            <p><b>Bitte:</b></p>
-            <ol>
-              <li>Öffnen Sie den angehängten Vertrag</li>
-              <li>Lesen Sie ihn sorgfältig durch</li>
-              <li>Unterschreiben Sie ihn auf der Website</li>
-            </ol>
-            <p>📞 078 471 16 72 &nbsp;|&nbsp; ✉️ amaros@bluewin.ch</p>
-            <p>Freundliche Grüsse,<br><b>Amaros Inh. Soliman</b></p>
-          </div>
-        </div>
-      `,
-      attachment: { filename: `Mietvertrag_${bookingRef}.pdf`, base64: pdfBase64 },
-    });
-
-    // ── 10. Notify owner ──────────────────────────────────────────────────────
-    await sendEmail({
-      to:      OWNER_EMAIL,
-      subject: `Neuer Vertrag gesendet – Buchung #${bookingRef}`,
-      html: `
-        <div style="font-family:Arial,sans-serif;max-width:500px;">
-          <h2>Neuer Mietvertrag gesendet</h2>
-          <table style="width:100%;border-collapse:collapse;">
-            <tr><td style="padding:6px;font-weight:bold;">Buchung:</td><td>#${bookingRef}</td></tr>
-            <tr><td style="padding:6px;font-weight:bold;">Kunde:</td><td>${customerName}</td></tr>
-            <tr><td style="padding:6px;font-weight:bold;">Email:</td><td>${esc(customer.email)}</td></tr>
-            <tr><td style="padding:6px;font-weight:bold;">Fahrzeug:</td><td>${esc(vehicle.name)}</td></tr>
-            <tr><td style="padding:6px;font-weight:bold;">Zeitraum:</td>
-                <td>${fmtDate(reservation.start_date)} → ${fmtDate(reservation.end_date)}</td></tr>
-            <tr><td style="padding:6px;font-weight:bold;">Gesamtpreis:</td>
-                <td>${fmtChf(reservation.total_price)}</td></tr>
-          </table>
-          <p style="color:#777;margin-top:20px;">Warten auf Unterschrift des Kunden.</p>
-        </div>
-      `,
-      attachment: { filename: `Mietvertrag_${bookingRef}.pdf`, base64: pdfBase64 },
-    });
-
-    console.log(`✅ Contract sent for reservation #${bookingRef}`);
-    return new Response(JSON.stringify({ success: true, ref: bookingRef }), {
-      headers: { "Content-Type": "application/json" },
-    });
+    console.log(`✅ Contract generated for reservation #${bookingRef}`);
+    return done({ success: true, ref: bookingRef });
 
   } catch (err) {
     console.error("Edge function error:", err);
@@ -363,6 +308,119 @@ serve(async (req) => {
   }
 });
 
+// ─── Status emails ────────────────────────────────────────────────────────────
+// signed_pending_review -> signed copy to customer + owner (owner then sets
+//                          contract_status to "confirmed" or "rejected" in Supabase)
+// confirmed             -> confirmation with pickup details to the customer
+// rejected / cancelled  -> cancellation to the customer, only if they had signed
+// Anything else (sent, expired, ...) sends nothing.
+// deno-lint-ignore no-explicit-any
+type Row = Record<string, any>;
+
+async function sendStatusEmails(
+  // deno-lint-ignore no-explicit-any
+  sb: any,
+  { reservation, customer, vehicle, bookingRef, from, to }:
+    { reservation: Row; customer: Row; vehicle: Row; bookingRef: string; from?: string; to?: string },
+): Promise<string[]> {
+  const name    = esc(`${customer.first_name} ${customer.last_name}`);
+  const summary = detailsTable(reservation, vehicle, bookingRef);
+
+  if (to === "signed_pending_review") {
+    const { data: file, error } = await sb.storage.from(STORAGE_BUCKET).download(reservation.signed_contract_path);
+    if (error || !file) throw new Error(`Signed contract not found: ${reservation.signed_contract_path}`);
+    const attachment = {
+      filename: `Mietvertrag_${bookingRef}_unterschrieben.pdf`,
+      base64:   toBase64(new Uint8Array(await file.arrayBuffer())),
+    };
+
+    await sendEmail({
+      to:      customer.email,
+      subject: `Ihr unterschriebener Mietvertrag – Buchung #${bookingRef}`,
+      html: layout("Vertrag erhalten", `
+        <p>Guten Tag <b>${name}</b>,</p>
+        <p>vielen Dank! Wir haben Ihren unterschriebenen Mietvertrag erhalten. Eine Kopie finden Sie im Anhang.</p>
+        ${summary}
+        <p><b>Ihre Buchung ist noch nicht bestätigt.</b> Wir prüfen sie und senden Ihnen die Bestätigung per E-Mail.</p>`),
+      attachment,
+    });
+
+    await sendEmail({
+      to:      OWNER_EMAIL,
+      subject: `Neue Buchung unterschrieben – #${bookingRef} bitte bestätigen`,
+      html: layout("Neue unterschriebene Buchung", `
+        <p><b>${name}</b> hat den Mietvertrag unterschrieben (im Anhang).</p>
+        ${summary}
+        <p>E-Mail: ${esc(customer.email)}<br>Mobile: ${esc(customer.mobile)}</p>
+        <p><b>Bestätigen oder ablehnen:</b> Supabase → Table Editor → reservations → Zeile ${reservation.id}
+        → <code>contract_status</code> auf <code>confirmed</code> oder <code>rejected</code> setzen.
+        Der Kunde erhält dann automatisch eine E-Mail.</p>`),
+      attachment,
+    });
+    return ["customer:signed", "owner:signed"];
+  }
+
+  if (to === "confirmed") {
+    await sendEmail({
+      to:      customer.email,
+      subject: `Ihre Buchung ist bestätigt – #${bookingRef}`,
+      html: layout("Buchung bestätigt", `
+        <p>Guten Tag <b>${name}</b>,</p>
+        <p>Ihre Buchung ist <b>bestätigt</b>. Wir freuen uns auf Sie!</p>
+        ${summary}
+        <p><b>Abholung:</b> ${fmtDate(reservation.start_date)} ab 08:00 Uhr, Mandachstrasse 50, 8155 Niederhasli (direkt am Bahnhof)<br>
+        <b>Rückgabe:</b> ${fmtDate(reservation.end_date)} bis 17:00 Uhr, am selben Ort</p>
+        <p>Am Miettag erhalten Sie den Zugangscode für die Schlüsselbox hinter der Fahrertür.
+        Bitte bringen Sie Ihren Führerausweis und Ihre ID mit.</p>`),
+    });
+    return ["customer:confirmed"];
+  }
+
+  if ((to === "rejected" || to === "cancelled") &&
+      (from === "signed_pending_review" || from === "confirmed")) {
+    await sendEmail({
+      to:      customer.email,
+      subject: `Ihre Buchung #${bookingRef} wurde storniert`,
+      html: layout("Buchung storniert", `
+        <p>Guten Tag <b>${name}</b>,</p>
+        <p>leider können wir Ihre Buchung <b>#${bookingRef}</b> nicht durchführen; sie wurde storniert.
+        Bei Fragen erreichen Sie uns jederzeit telefonisch oder per WhatsApp.</p>
+        ${summary}`),
+    });
+    return ["customer:cancelled"];
+  }
+
+  return [];
+}
+
+function detailsTable(reservation: Row, vehicle: Row, bookingRef: string) {
+  const row = (label: string, value: string) =>
+    `<tr><td style="padding:5px 10px;font-weight:bold;width:140px;">${label}</td><td style="padding:5px 10px;">${value}</td></tr>`;
+  return `<table style="background:#f8f8f8;border-radius:8px;width:100%;margin:16px 0;border-collapse:collapse;">
+    ${row("Buchung:", `#${bookingRef}`)}
+    ${row("Fahrzeug:", esc(vehicle.name))}
+    ${row("Abholdatum:", fmtDate(reservation.start_date))}
+    ${row("Rückgabedatum:", fmtDate(reservation.end_date))}
+    ${row("Gesamtpreis:", `CHF ${fmtChf(reservation.total_price)}`)}
+  </table>`;
+}
+
+function layout(title: string, inner: string) {
+  return `
+    <div style="font-family:Arial,sans-serif;max-width:580px;margin:auto;color:#333;">
+      <div style="background:#1a1a2e;color:white;padding:24px 30px;border-radius:10px 10px 0 0;">
+        <h2 style="margin:0;">Amaros Fahrzeugvermietung</h2>
+        <p style="margin:6px 0 0;color:#aaa;font-size:13px;">${title}</p>
+      </div>
+      <div style="padding:28px 30px;border:1px solid #eee;border-top:none;border-radius:0 0 10px 10px;">
+        ${inner}
+        <p style="margin-top:24px;">Telefon/WhatsApp: +41 78 471 16 72 · E-Mail: amaros@bluewin.ch</p>
+        <p>Freundliche Grüsse<br><b>Amaros Inh. Soliman</b><br>
+        <span style="color:#888;font-size:12px;">Alte Poststrasse 3, 8172 Niederglatt</span></p>
+      </div>
+    </div>`;
+}
+
 // ─── Brevo email helper ───────────────────────────────────────────────────────
 // Brevo's transactional endpoint. Unlike Resend's shared test sender, this
 // delivers to ANY recipient once FROM_EMAIL is a verified Brevo sender.
@@ -371,7 +429,7 @@ async function sendEmail({ to, subject, html, attachment }: {
   to: string;
   subject: string;
   html: string;
-  attachment: { filename: string; base64: string };
+  attachment?: { filename: string; base64: string };
 }) {
   const res = await fetch("https://api.brevo.com/v3/smtp/email", {
     method: "POST",
@@ -385,7 +443,7 @@ async function sendEmail({ to, subject, html, attachment }: {
       to:          [{ email: to }],
       subject,
       htmlContent: html,
-      attachment:  [{ name: attachment.filename, content: attachment.base64 }],
+      ...(attachment && { attachment: [{ name: attachment.filename, content: attachment.base64 }] }),
     }),
   });
 

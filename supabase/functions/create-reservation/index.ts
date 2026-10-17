@@ -27,7 +27,9 @@ const VOLLKASKO_PER_DAY   = 15.00;  // CHF per rental day when selected
 const MAX_OPEN_BOOKINGS_PER_EMAIL = 3;
 // Bookings in these states no longer hold their dates (keep in sync with
 // reserved_dates() in supabase/migrations).
-const RELEASED_STATUSES = ["cancelled", "rejected"];
+const RELEASED_STATUSES = ["cancelled", "rejected", "expired"];
+// An unsigned booking holds its dates this long (see expire-unsigned-bookings cron).
+const HOLD_MS = 2 * 60 * 60 * 1000;
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -235,6 +237,7 @@ serve(async (req) => {
         extra_total:           price.extraTotal,
         total_price:           price.totalPrice,
         contract_status:       "pending",
+        hold_expires_at:       new Date(Date.now() + HOLD_MS).toISOString(),
         contract_path:         null,
         signed_contract_path:  null,
         signed_at:             null,

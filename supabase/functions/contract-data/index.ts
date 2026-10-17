@@ -86,10 +86,14 @@ serve(async (req) => {
     // Signing is only allowed once, after send-contract generated the PDF.
     const { data: current } = await sb
       .from("reservations")
-      .select("contract_status")
+      .select("contract_status, hold_expires_at")
       .eq("id", id)
       .single();
 
+    // The cron job marks old holds "expired" every 5 minutes; check the time too.
+    if (current?.hold_expires_at && new Date(current.hold_expires_at) < new Date()) {
+      return json({ error: "Die Reservierung ist abgelaufen (2 Stunden). Bitte buchen Sie erneut." }, 409);
+    }
     if (current?.contract_status !== "sent") {
       return json({ error: "Dieser Vertrag kann nicht mehr unterschrieben werden." }, 409);
     }
