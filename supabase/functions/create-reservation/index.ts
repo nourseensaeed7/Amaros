@@ -25,6 +25,9 @@ const HAFTPFLICHT_PER_DAY = 12.00;  // CHF per rental day when selected ("/ Tag"
 const VOLLKASKO_PER_DAY   = 15.00;  // CHF per rental day when selected
 
 const MAX_OPEN_BOOKINGS_PER_EMAIL = 3;
+// Bookings in these states no longer hold their dates (keep in sync with
+// reserved_dates() in supabase/migrations).
+const RELEASED_STATUSES = ["cancelled", "rejected"];
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -119,8 +122,17 @@ serve(async (req) => {
     if (!reservation.car_id || !reservation.start_date || !reservation.end_date) {
       return json({ error: "Missing required reservation fields" }, 400);
     }
-    if (new Date(reservation.end_date) < new Date(reservation.start_date)) {
+    const isoDate = /^\d{4}-\d{2}-\d{2}$/;
+    if (!isoDate.test(reservation.start_date) || !isoDate.test(reservation.end_date) ||
+        isNaN(Date.parse(reservation.start_date)) || isNaN(Date.parse(reservation.end_date))) {
+      return json({ error: "Ungültiges Datum." }, 400);
+    }
+    if (reservation.end_date < reservation.start_date) {
       return json({ error: "Das Rückgabedatum darf nicht vor dem Startdatum liegen." }, 400);
+    }
+    const todayZurich = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Zurich" }).format(new Date());
+    if (reservation.start_date < todayZurich) {
+      return json({ error: "Das Startdatum liegt in der Vergangenheit." }, 400);
     }
 
     // Re-check the 25-year-old minimum age server-side (don't trust the client)
@@ -150,6 +162,28 @@ serve(async (req) => {
 
     if (vehicleError || !vehicle) {
       return json({ error: "Fahrzeug nicht gefunden." }, 404);
+    }
+
+    // ── Availability — the calendar only blocks dates in the browser ───────
+    // Inclusive day ranges overlap when existing.start <= new.end and
+    // existing.end >= new.start; this also catches a multi-day booking that
+    // spans an existing one.
+    // shortcut: check-then-insert, so two requests in the same instant could
+    // both pass; add a DB exclusion constraint if bookings get busy.
+    const { count: clashes, error: clashError } = await sb
+      .from("reservations")
+      .select("id", { count: "exact", head: true })
+      .eq("car_id", vehicle.id)
+      .lte("start_date", reservation.end_date)
+      .gte("end_date", reservation.start_date)
+      .not("contract_status", "in", `(${RELEASED_STATUSES.join(",")})`);
+
+    if (clashError) {
+      console.error("create-reservation availability error:", clashError);
+      return json({ error: "Verfügbarkeit konnte nicht geprüft werden." }, 500);
+    }
+    if ((clashes ?? 0) > 0) {
+      return json({ error: "Dieser Lieferwagen ist in diesem Zeitraum bereits reserviert. Bitte wählen Sie andere Daten." }, 409);
     }
 
     const price = computePrice(vehicle.price_per_day, reservation);

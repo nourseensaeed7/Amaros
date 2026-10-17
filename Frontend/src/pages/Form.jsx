@@ -643,7 +643,11 @@ const Form = () => {
       );
 
       if (createError || createData?.error) {
-        throw new Error(createData?.error || "Fehler beim Speichern der Reservierung.");
+        // invoke() hides the body of non-2xx replies; it holds our German message.
+        const body = createError?.context?.json
+          ? await createError.context.json().catch(() => null)
+          : createData;
+        throw new Error(body?.error || "Fehler beim Speichern der Reservierung.");
       }
 
       const newReservationId = createData.reservationId;
@@ -663,7 +667,7 @@ const Form = () => {
 
     } catch (err) {
       console.error(err);
-      showToast("Fehler beim Speichern der Reservierung: " + err.message);
+      showToast(err.message || "Fehler beim Speichern der Reservierung.");
     } finally {
       setSubmitting(false);
     }
